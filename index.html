@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production Agent Guide</title>
+  <meta name="description" content="TypeScript patterns for autonomous agents. Based on dozens of research reports and theory going back to 1948.">
+
+  <!-- IBM Plex Mono - the unified typeface -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/cybernetic.css">
+  <link rel="stylesheet" href="css/system-diagram.css">
+</head>
+<body>
+  <!-- The Loop Indicator - always visible, always pulsing -->
+  <div class="loop-indicator" aria-hidden="true">
+    <svg viewBox="0 0 100 100" class="loop-svg">
+      <circle cx="50" cy="50" r="35" class="loop-track"/>
+      <circle cx="50" cy="50" r="35" class="loop-progress"/>
+      <circle cx="50" cy="15" r="6" class="loop-dot"/>
+    </svg>
+    <span class="loop-label">while(true)</span>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="nav" aria-label="Chapter navigation">
+    <a href="#title" class="nav-link" data-section="0">00</a>
+    <a href="#system" class="nav-link" data-section="1" title="System Overview">S</a>
+    <a href="#principles" class="nav-link" data-section="2">P</a>
+    <a href="#loop" class="nav-link" data-section="3">01</a>
+    <a href="#tools" class="nav-link" data-section="4">02</a>
+    <a href="#validation" class="nav-link" data-section="5">03</a>
+    <a href="#state" class="nav-link" data-section="6">04</a>
+    <a href="#security" class="nav-link" data-section="7">05</a>
+    <a href="#evaluation" class="nav-link" data-section="8">06</a>
+    <a href="#ops" class="nav-link" data-section="9">07</a>
+    <a href="#orchestration" class="nav-link" data-section="10">08</a>
+    <a href="#complete" class="nav-link" data-section="11">09</a>
+  </nav>
+
+  <main class="main">
+    <!-- Title -->
+    <section id="title" class="section section--hero">
+      <div class="hero">
+        <h1 class="hero__title">
+          <span class="hero__line">Production</span>
+          <span class="hero__line">Agent</span>
+          <span class="hero__line">Guide</span>
+        </h1>
+        <p class="hero__sub">TypeScript patterns for autonomous agents</p>
+        <p class="hero__meta">Dozens of research reports. Theory back to <span class="highlight--cyan">1948</span>. <a href="guide.md" class="hero__md-link">Read as Markdown</a></p>
+        <div class="hero__scroll">
+          <span>scroll</span>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 4v12M5 11l5 5 5-5" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- System Overview - The Big Picture -->
+    <section id="system" class="section system-overview">
+      <header class="system-overview__header">
+        <h2 class="system-overview__title">The System</h2>
+        <p class="system-overview__subtitle">Everything works together. Here's how.</p>
+      </header>
+      <div class="system-overview__diagram" aria-label="Animated diagram showing the agent architecture loop"></div>
+    </section>
+
+    <!-- Principles -->
+    <section id="principles" class="section">
+      <header class="section__header">
+        <span class="section__number">00</span>
+        <h2 class="section__title">Someone already figured this out</h2>
+      </header>
+
+      <div class="content">
+        <p>We read dozens of reports, traced ideas back 80 years, and talked to people running agents in production. They all built the same thing.</p>
+
+        <p><a href="papers/wiener-1948-cybernetics.pdf" class="citation" title="Cybernetics: Or Control and Communication in the Animal and the Machine"><span class="highlight--cyan">Wiener</span></a> described the architecture in <span class="highlight--coral">1948</span>. <a href="papers/ashby-1956-cybernetics.pdf" class="citation" title="An Introduction to Cybernetics"><span class="highlight--cyan">Ashby</span></a> added the constraints in <span class="highlight--coral">1956</span>. <a href="papers/brooks-1986-robust-layered.pdf" class="citation" title="A Robust Layered Control System For A Mobile Robot"><span class="highlight--cyan">Brooks</span></a> nailed the safety model in <span class="highlight--coral">1986</span>. The theory was done before most of us were born.</p>
+
+        <blockquote class="quote">
+          "Stop trying to invent new frameworks. The frameworks exist."
+        </blockquote>
+
+        <h3>What we found</h3>
+        <p>An agent is a <code class="inline-code">while</code> loop. It asks an LLM what to do, checks if that makes sense, runs the tool, and looks at what happened. Then it does that again until the task is done.</p>
+
+        <p>Everything else you'll read about (retries, rate limits, checkpoints, monitoring) goes around this loop. <em>The loop itself is maybe 50 lines of code.</em></p>
+
+        <!-- The Core Agent Code -->
+        <div class="code-block" data-title="agent.ts">
+          <pre><code><span class="line"><span class="kw">async function</span> <span class="fn">agent</span>( <span class="note" data-note="The entire agent is a single async function. No classes, no frameworks, no magic. Just a function that runs until done.">// the whole thing</span></span>
+<span class="line">  task: <span class="type">string</span>, <span class="note" data-note="The user's goal in natural language. This becomes the first message in the conversation.">// what to do</span></span>
+<span class="line">  tools: <span class="type">Tool[]</span>, <span class="note" data-note="Array of tool definitions. Each tool has a schema (for the LLM) and an execute function (your code). See Ashby's Law of Requisite Variety.">// capabilities</span></span>
+<span class="line">  llm: <span class="type">LLM</span> <span class="note" data-note="The language model client. Could be Claude, GPT, or any model that supports tool use. This is the only part you don't control.">// the brain</span></span>
+<span class="line">): <span class="type">Promise&lt;Result&gt;</span> {</span>
+<span class="line">  <span class="kw">const</span> messages: <span class="type">Message[]</span> = [ <span class="note" data-note="The conversation history. This is the agent's working memory. It grows with each turn until context limits force pruning.">// conversation state</span></span>
+<span class="line">    { role: <span class="str">'user'</span>, content: task }</span>
+<span class="line">  ];</span>
+<span class="line"></span>
+<span class="line highlighted">  <span class="kw">while</span> (<span class="kw">true</span>) { <span class="note" data-note="The infinite loop. Wiener's cybernetic principle (1948): observe, act, observe again. The loop only breaks from inside when the agent explicitly signals completion.">// Wiener's loop</span></span>
+<span class="line stochastic">    <span class="kw">const</span> response = <span class="kw">await</span> llm.<span class="fn">invoke</span>( <span class="note" data-note="This is the ONLY non-deterministic line in the entire agent. Every other line does exactly what you wrote. This line asks the LLM to decide what to do next.">// STOCHASTIC</span></span>
+<span class="line stochastic">      messages, tools</span>
+<span class="line stochastic">    );</span>
+<span class="line"></span>
+<span class="line">    <span class="kw">if</span> (response.done) { <span class="note" data-note="The LLM must actively say 'I'm done' by calling a done tool. If you exit when there are no tool calls, agents quit when confused instead of asking for help.">// explicit exit only</span></span>
+<span class="line">      <span class="kw">return</span> response.result;</span>
+<span class="line">    }</span>
+<span class="line"></span>
+<span class="line deterministic">    <span class="kw">for</span> (<span class="kw">const</span> call <span class="kw">of</span> response.toolCalls) { <span class="note" data-note="Tool execution is YOUR code, not the LLM's. You validate inputs. You handle errors. You decide what actually runs. The LLM only suggested it.">// DETERMINISTIC</span></span>
+<span class="line deterministic">      <span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">execute</span>(call); <span class="note" data-note="Your execute() function runs the tool. Add validation, rate limiting, sandboxing here. This is where Brooks' safety layers live.">// your code runs</span></span>
+<span class="line deterministic">      messages.<span class="fn">push</span>({ <span class="note" data-note="Push the result back into the conversation so the LLM can see what happened. This closes the feedback loop.">// observation</span></span>
+<span class="line deterministic">        ...result,</span>
+<span class="line deterministic">        ephemeral: <span class="kw">true</span> <span class="note" data-note="Mark results that can be dropped when context runs low. Browser screenshots are 50KB each. After 20 calls, you have 1MB of stale DOM. Keep only recent ones.">// can be pruned</span></span>
+<span class="line deterministic">      });</span>
+<span class="line deterministic">    }</span>
+<span class="line">  } <span class="note" data-note="The loop continues until the LLM calls the done tool. There's no timeout here—that belongs in the ops layer wrapping this function.">// repeat forever</span></span>
+<span class="line">}</span></code></pre>
+        </div>
+
+        <p class="caption">The entire agent architecture. The <span class="highlight--cyan">stochastic</span> part is three lines. Everything else is <span class="highlight--coral">deterministic</span>.</p>
+      </div>
+    </section>
+
+    <!-- Chapter 1: The Loop -->
+    <section id="loop" class="section">
+      <header class="section__header">
+        <span class="section__number">01</span>
+        <h2 class="section__title">The loop</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">Ask the LLM, check its answer, run the tool, see what happened. Repeat.</p>
+
+        <h3>Where this came from</h3>
+        <p><a href="papers/wiener-1948-cybernetics.pdf" class="citation" title="Cybernetics: Or Control and Communication in the Animal and the Machine (1948)"><span class="highlight--cyan">Norbert Wiener</span></a> drew feedback loops in 1948 when he was working on anti-aircraft guns. The target moves, you observe, you adjust. Control systems have looked like this ever since.</p>
+
+        <h3>Why everyone builds the same thing</h3>
+        <p>We looked at <a href="https://github.com/anthropics/claude-code" class="citation" title="Claude Code: Agentic coding tool">Claude Code</a>, <a href="https://github.com/ghuntley/loom" class="citation" title="Loom: AI-powered coding agent">Loom</a>, <a href="https://github.com/steveyegge/gastown" class="citation" title="Gas Town: Multi-agent workspace manager">Gas Town</a>, <a href="https://github.com/browser-use/browser-use" class="citation" title="Browser-Use: Browser automation for AI agents">Browser-Use</a>. Different teams, different companies, different years. Same architecture.</p>
+
+        <blockquote class="quote">
+          "An agent runs tools in a loop to achieve a goal."
+          <cite>— <a href="https://simonwillison.net/2025/Sep/18/agents/" class="citation" title="I think 'agent' may finally have a widely enough agreed upon definition to be useful jargon now">Simon Willison</a></cite>
+        </blockquote>
+
+        <h3>Your code vs. the LLM</h3>
+        <p>Your code runs the loop. Your code validates. Your code executes tools. The LLM sits inside that loop and answers one question: <em>"Given this situation, what should I do next?"</em></p>
+
+        <div class="code-block" data-title="the-pattern.ts">
+          <pre><code><span class="line"><span class="cmt">// The LLM is one line.</span> <span class="note" data-note="This is the key insight: the stochastic part is tiny. Your deterministic code wraps it completely.">// key insight</span></span>
+<span class="line"><span class="cmt">// You own everything else.</span></span>
+<span class="line"></span>
+<span class="line highlighted"><span class="kw">while</span> (!done) { <span class="note" data-note="The loop continues until explicit completion. 'done' is set by your code when the agent calls the done tool—never by the LLM directly.">// Wiener's control loop</span></span>
+<span class="line stochastic">  <span class="kw">const</span> action = <span class="kw">await</span> llm.<span class="fn">generate</span>(context); <span class="note" data-note="This single line is where non-determinism enters. The LLM reads context and suggests an action. Everything else is deterministic.">// STOCHASTIC</span></span>
+<span class="line"></span>
+<span class="line deterministic">  <span class="kw">if</span> (<span class="fn">isValid</span>(action)) { <span class="note" data-note="Validation is YOUR code. Brooks' safety layers: check schema, permissions, resource limits. Reject bad actions before execution.">// Brooks' safety check</span></span>
+<span class="line deterministic">    <span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">execute</span>(action); <span class="note" data-note="Execution is YOUR code running YOUR tools. You control sandboxing, timeouts, error handling. The LLM only suggested.">// DETERMINISTIC</span></span>
+<span class="line deterministic">    <span class="fn">observe</span>(result); <span class="note" data-note="Observation closes the feedback loop. Push the result into context so the LLM can see what happened and decide what to do next.">// feedback to LLM</span></span>
+<span class="line deterministic">  }</span>
+<span class="line">} <span class="note" data-note="That's the entire pattern. Observe → Act → Observe. Wiener described this for anti-aircraft guns in 1948. It hasn't changed.">// that's it</span></span></code></pre>
+        </div>
+        <p class="caption">Wiener drew this in 1948.</p>
+      </div>
+    </section>
+
+    <!-- Chapter 2: Tools -->
+    <section id="tools" class="section">
+      <header class="section__header">
+        <span class="section__number">02</span>
+        <h2 class="section__title">Tool design</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">Give the agent more tools than you think it needs. Check what it does with them. Cut back if you have to.</p>
+
+        <h3>Ashby's Law</h3>
+        <p><a href="papers/ashby-1956-cybernetics.pdf" class="citation" title="An Introduction to Cybernetics (1956)"><span class="highlight--cyan">Ross Ashby</span></a>, 1956: <em>"Only variety can absorb variety."</em> Translation: your agent can only handle problems as complex as its tool set allows. When people say "the model is dumb," often the model just didn't have the right tools.</p>
+
+        <h3>The usual mistake</h3>
+        <p>Teams start with a locked-down tool set. They add capabilities one by one. They hope it's enough. <strong>This is backwards.</strong></p>
+        <p>Start with everything. Watch what the agent does. Restrict based on what actually goes wrong.</p>
+
+        <h3>Three things that matter</h3>
+        <ul class="list">
+          <li><strong>Done Tool:</strong> Make the agent say "I'm finished" explicitly. If you just stop when there are no tool calls, agents quit when they're confused.</li>
+          <li><strong>Ephemeral Results:</strong> Browser screenshots are 50KB each. After 20 calls, you have 1MB of stale DOM. Keep only the recent ones.</li>
+          <li><strong>Strict Schemas:</strong> Tell the agent exactly what parameters you expect. Validate before execution.</li>
+        </ul>
+
+        <div class="code-block" data-title="tools.ts">
+          <pre><code><span class="line"><span class="cmt">// Done tool: force explicit completion</span></span>
+<span class="line"><span class="kw">const</span> doneTool: <span class="type">Tool</span> = { <span class="note" data-note="Without a done tool, agents exit when they have no tool calls. This happens when they're confused, not when they're done. Force explicit completion.">// critical</span></span>
+<span class="line">  definition: {</span>
+<span class="line">    name: <span class="str">'task_complete'</span>,</span>
+<span class="line">    description: <span class="str">'Call when you are done'</span>, <span class="note" data-note="Be specific in descriptions. 'Call when the task is fully complete and verified' works better than 'Call when done'.">// be specific</span></span>
+<span class="line">  },</span>
+<span class="line">  execute: <span class="kw">async</span> (input) => {</span>
+<span class="line">    <span class="kw">throw new</span> <span class="fn">TaskComplete</span>(input); <span class="note" data-note="Throwing breaks the loop cleanly. The agent loop catches TaskComplete and returns the result. Any other exception is an error.">// exit via throw</span></span>
+<span class="line">  },</span>
+<span class="line">};</span>
+<span class="line"></span>
+<span class="line"><span class="cmt">// Ephemeral: only keep the last 3</span></span>
+<span class="line"><span class="kw">const</span> getBrowserState: <span class="type">Tool</span> = {</span>
+<span class="line">  definition: { <span class="cmt">/* ... */</span> },</span>
+<span class="line">  execute: <span class="kw">async</span> () => { <span class="cmt">/* ... */</span> },</span>
+<span class="line">  ephemeral: { keepLast: <span class="num">3</span> }, <span class="note" data-note="Browser screenshots are ~50KB base64. After 20 calls = 1MB of stale DOM. Mark large outputs as ephemeral and prune old ones when context runs low.">// context management</span></span>
+<span class="line">};</span></code></pre>
+        </div>
+        <p class="caption">Start generous. Restrict based on evidence.</p>
+      </div>
+    </section>
+
+    <!-- Chapter 3: Validation -->
+    <section id="validation" class="section">
+      <header class="section__header">
+        <span class="section__number">03</span>
+        <h2 class="section__title">Validation</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">The LLM gets it right maybe 70% of the time. Your validation code catches the other 30%.</p>
+
+        <h3>Do the math</h3>
+        <p>Say each step works 70% of the time. Over 10 steps:</p>
+        <p class="math"><code class="inline-code">0.70^10 = 2.8%</code></p>
+        <p>Now add validation that catches 80% of mistakes:</p>
+        <p class="math"><code class="inline-code">0.94^10 = 53.8%</code></p>
+        <p>Validation turns a useless agent into one that works half the time. Add retries and you're in business.</p>
+
+        <h3>Safety layers (Brooks, 1986)</h3>
+        <p><a href="papers/brooks-1986-robust-layered.pdf" class="citation" title="A Robust Layered Control System For A Mobile Robot"><span class="highlight--cyan">Rodney Brooks</span></a> built robots at MIT. His rule: lower layers override higher layers. Safety beats efficiency. Efficiency beats the goal. The goal never overrides safety.</p>
+
+        <ul class="list list--layers">
+          <li><span class="layer layer--0">Layer 0:</span> System safety. Cannot be bypassed.</li>
+          <li><span class="layer layer--1">Layer 1:</span> Resource limits.</li>
+          <li><span class="layer layer--2">Layer 2:</span> Policy checks.</li>
+          <li><span class="layer layer--3">Layer 3:</span> The actual task.</li>
+        </ul>
+
+        <div class="code-block" data-title="validation.ts">
+          <pre><code><span class="line"><span class="cmt">// Lower layers always win (Brooks' subsumption)</span></span>
+<span class="line"><span class="kw">const</span> safetyLayers = [ <span class="note" data-note="Brooks' subsumption architecture: lower-numbered layers have priority. Layer 0 can veto anything. Layer 3 only runs if 0-2 all pass.">// priority order</span></span>
+<span class="line">  {</span>
+<span class="line">    level: <span class="num">0</span>, <span class="note" data-note="System integrity cannot be bypassed by any higher layer. No prompt, no user request, no business logic can override this.">// cannot bypass</span></span>
+<span class="line">    name: <span class="str">'system_integrity'</span>,</span>
+<span class="line">    check: (action) => !<span class="fn">isSystemDestructive</span>(action),</span>
+<span class="line">  },</span>
+<span class="line">  {</span>
+<span class="line">    level: <span class="num">1</span>, <span class="note" data-note="Resource limits prevent runaway costs. Check token budgets, API rate limits, execution time. Fail fast before you burn money.">// cost control</span></span>
+<span class="line">    name: <span class="str">'resource_limits'</span>,</span>
+<span class="line">    check: (action, ctx) => <span class="fn">isWithinLimits</span>(action, ctx),</span>
+<span class="line">  },</span>
+<span class="line">  {</span>
+<span class="line">    level: <span class="num">2</span>, <span class="note" data-note="Policy compliance is business logic: allowed domains, permitted actions, user permissions. This layer is configurable per deployment.">// business rules</span></span>
+<span class="line">    name: <span class="str">'policy_compliance'</span>,</span>
+<span class="line">    check: (action, ctx) => <span class="fn">isPolicyCompliant</span>(action, ctx.policy),</span>
+<span class="line">  },</span>
+<span class="line">]; <span class="note" data-note="The actual task (level 3) only executes after all safety layers pass. This is the key insight from Brooks: behavior emerges from layered constraints.">// task is level 3</span></span>
+<span class="line"></span>
+<span class="line"><span class="cmt">// Check in order. Stop at first failure.</span></span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 4: State -->
+    <section id="state" class="section">
+      <header class="section__header">
+        <span class="section__number">04</span>
+        <h2 class="section__title">State and memory</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">Write things to files. Context windows fill up and cost money. Disk is cheap.</p>
+
+        <h3>Where memory goes</h3>
+        <p><a href="https://ghuntley.com/loop/" class="citation" title="Everything is a Ralph Loop"><span class="highlight--cyan">Geoffrey Huntley</span></a> runs <a href="https://github.com/ghuntley/loom" class="citation" title="Loom: AI-powered coding agent">Loom</a>. His agents remember things by writing markdown files and making git commits. The context window starts fresh each time. Files persist forever.</p>
+
+        <blockquote class="quote">
+          "Memory persists through filesystem, not in-context."
+          <cite>— <a href="https://ghuntley.com/agent/" class="citation" title="How to Build a Coding Agent">Geoffrey Huntley</a></cite>
+        </blockquote>
+
+        <h3>Event sourcing</h3>
+        <p>Log every action as it happens. Current state is derived from the log. This gives you:</p>
+        <ul class="list">
+          <li>A complete record of what happened</li>
+          <li>The ability to replay any point in time</li>
+          <li>Easy debugging (run the same sequence locally)</li>
+          <li>Recovery from crashes (pick up where you left off)</li>
+        </ul>
+        <p>Never mutate state directly. <strong>Append events. Compute state from events.</strong></p>
+
+        <div class="code-block" data-title="state.ts">
+          <pre><code><span class="line"><span class="cmt">// Append-only event log (event sourcing)</span></span>
+<span class="line"><span class="kw">class</span> <span class="type">EventStore</span> { <span class="note" data-note="Event sourcing: never mutate state directly. Append events, derive state. This gives you full history, replay capability, and crash recovery.">// immutable history</span></span>
+<span class="line">  <span class="kw">private</span> events: <span class="type">AgentEvent[]</span> = []; <span class="note" data-note="The event log is the source of truth. State is just a cached computation over events. You can always rebuild state from events.">// source of truth</span></span>
+<span class="line"></span>
+<span class="line">  <span class="fn">append</span>(event): <span class="type">AgentEvent</span> { <span class="note" data-note="Never modify events after they're appended. If something was wrong, append a correction event. This creates an audit trail.">// write-once</span></span>
+<span class="line">    <span class="kw">const</span> complete = {</span>
+<span class="line">      ...event,</span>
+<span class="line">      id: <span class="fn">generateId</span>(), <span class="note" data-note="UUIDs let you correlate events across systems. Use them for debugging, metrics, and distributed tracing.">// unique ID</span></span>
+<span class="line">      timestamp: Date.<span class="fn">now</span>(), <span class="note" data-note="Timestamps enable replay at any point in time. 'Show me the state as of 3pm yesterday' becomes trivial.">// when it happened</span></span>
+<span class="line">    };</span>
+<span class="line">    <span class="kw">this</span>.events.<span class="fn">push</span>(complete);</span>
+<span class="line">    <span class="kw">return</span> complete;</span>
+<span class="line">  }</span>
+<span class="line"></span>
+<span class="line">  <span class="fn">getState</span>(): <span class="type">DerivedState</span> { <span class="note" data-note="State is computed by replaying events through a reducer. Same events always produce same state. This makes debugging deterministic.">// derived, not stored</span></span>
+<span class="line">    <span class="cmt">// Replay events to get current state</span></span>
+<span class="line">    <span class="kw">return this</span>.events.<span class="fn">reduce</span>(</span>
+<span class="line">      reduceEvent, initialState <span class="note" data-note="The reducer is pure: (state, event) => newState. No side effects. This is why you can replay events safely.">// pure function</span></span>
+<span class="line">    );</span>
+<span class="line">  }</span>
+<span class="line">}</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 5: Security -->
+    <section id="security" class="section">
+      <header class="section__header">
+        <span class="section__number">05</span>
+        <h2 class="section__title">Security</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">Three things together cause problems: private data, outside input, and actions that affect the world. Remove one.</p>
+
+        <h3>The trifecta</h3>
+        <p><a href="https://simonw.substack.com/p/the-lethal-trifecta-for-ai-agents" class="citation" title="The Lethal Trifecta for AI Agents"><span class="highlight--cyan">Simon Willison</span></a> named this. If your agent has:</p>
+        <ol class="list list--numbered">
+          <li>Access to secrets, databases, internal systems</li>
+          <li>Input from users, websites, emails</li>
+          <li>The ability to send messages, run code, change data</li>
+        </ol>
+        <p>Then someone can trick it into leaking your secrets or doing things you didn't authorize. <strong>Any two of these three are fine. All three together is a problem.</strong></p>
+
+        <blockquote class="quote">
+          "Prompt injection is an architectural flaw."
+          <cite>— <a href="https://simonwillison.net/series/prompt-injection/" class="citation" title="Prompt Injection series">Simon Willison</a></cite>
+        </blockquote>
+
+        <h3>Defense in depth</h3>
+        <p>Any one defense can be bypassed. Stack them: sanitize inputs, isolate capabilities, validate actions, sandbox execution, filter outputs. The attacker has to beat all of them.</p>
+
+        <div class="code-block" data-title="security.ts">
+          <pre><code><span class="line"><span class="cmt">// Check the trifecta</span> <span class="note" data-note="Simon Willison's insight: three things together create prompt injection risk. Any two are safe. All three together is dangerous.">// Willison's rule</span></span>
+<span class="line"><span class="kw">function</span> <span class="fn">assessTrifectaRisk</span>(assessment) { <span class="note" data-note="Run this check during planning, not execution. If you're at risk, redesign before you build.">// check early</span></span>
+<span class="line">  <span class="kw">const</span> hasAll =</span>
+<span class="line">    assessment.privateData.present && <span class="note" data-note="Access to secrets, databases, internal APIs. If you don't have this, attackers can't steal anything valuable.">// secrets/databases</span></span>
+<span class="line">    assessment.untrustedInput.present && <span class="note" data-note="User input, web content, emails. The attack vector. If all input is trusted, there's no injection point.">// user/web input</span></span>
+<span class="line">    assessment.externalActions.present; <span class="note" data-note="Ability to send messages, run code, modify data. If the agent can only read, it can't hurt anything.">// write capability</span></span>
+<span class="line"></span>
+<span class="line">  <span class="kw">if</span> (!hasAll) { <span class="note" data-note="Missing one leg of the trifecta means you're architecturally safe from prompt injection. Design to keep it that way.">// safe by design</span></span>
+<span class="line">    <span class="kw">return</span> { risk: <span class="str">'low'</span> };</span>
+<span class="line">  }</span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// All three: you have a problem</span></span>
+<span class="line">  <span class="kw">return</span> { <span class="note" data-note="When all three are present, prompt injection is an architectural vulnerability. No amount of prompt engineering fixes this.">// architectural flaw</span></span>
+<span class="line">    risk: <span class="str">'critical'</span>,</span>
+<span class="line">    mitigations: [ <span class="note" data-note="Defense in depth: stack multiple mitigations. Any one can be bypassed. The attacker has to beat all of them.">// stack defenses</span></span>
+<span class="line">      <span class="str">'Isolate sensitive data access'</span>, <span class="note" data-note="Put secrets in a separate process/service that the agent can't directly access.">// remove leg 1</span></span>
+<span class="line">      <span class="str">'Sanitize all inputs'</span>, <span class="note" data-note="Strip injection attempts before they reach the LLM. Won't catch everything, but raises the bar.">// harden leg 2</span></span>
+<span class="line">      <span class="str">'Require confirmation for actions'</span>, <span class="note" data-note="Human in the loop for dangerous actions. Removes autonomy but prevents blind execution.">// gate leg 3</span></span>
+<span class="line">    ],</span>
+<span class="line">  };</span>
+<span class="line">}</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 6: Evaluation -->
+    <section id="evaluation" class="section">
+      <header class="section__header">
+        <span class="section__number">06</span>
+        <h2 class="section__title">Evaluation</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">Run the same test 50 times. Look at the distribution. Single runs tell you nothing.</p>
+
+        <h3>Statistics, not assertions</h3>
+        <p><a href="papers/fisher-1925-statistical-methods.pdf" class="citation" title="Statistical Methods for Research Workers (1925)"><span class="highlight--cyan">R.A. Fisher</span></a>, 1925: one successful experiment doesn't prove your hypothesis. One failure doesn't disprove it. You need repeated trials.</p>
+        <p>An agent that works 70% of the time will sometimes pass your test and sometimes fail it. Running it once gives you a coin flip, not an answer.</p>
+
+        <h3>What changes</h3>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Old thinking</th>
+              <th>New thinking</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Does it work?</td>
+              <td>How often does it work?</td>
+            </tr>
+            <tr>
+              <td>Pass or fail</td>
+              <td>Success rate with confidence interval</td>
+            </tr>
+            <tr>
+              <td>Fix the bug</td>
+              <td>Shift the distribution</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="code-block" data-title="evaluation.test.ts">
+          <pre><code><span class="line"><span class="cmt">// Run it many times. Look at the rate.</span></span>
+<span class="line"><span class="fn">test</span>(<span class="str">'agent works >80% of the time'</span>, <span class="kw">async</span> () => { <span class="note" data-note="The test name says '80% of the time', not 'works'. This is the mindset shift: you're testing a distribution, not a boolean.">// statistical test</span></span>
+<span class="line">  <span class="kw">const</span> results = <span class="kw">await</span> <span class="fn">runEvaluation</span>({</span>
+<span class="line">    task: <span class="str">'do something'</span>,</span>
+<span class="line">    runs: <span class="num">50</span>, <span class="note" data-note="50 runs gives you a reasonable confidence interval. More runs = narrower interval = more confidence. But more runs = more cost and time.">// sample size</span></span>
+<span class="line">    timeout: <span class="num">30000</span>,</span>
+<span class="line">  });</span>
+<span class="line"></span>
+<span class="line">  <span class="fn">expect</span>(results.successRate).<span class="fn">toBeGreaterThan</span>(<span class="num">0.8</span>); <span class="note" data-note="Assert on the rate, not on individual runs. An agent at 75% success will pass this test sometimes by luck. That's statistics.">// rate, not pass/fail</span></span>
+<span class="line">  <span class="fn">expect</span>(results.variance).<span class="fn">toBeLessThan</span>(<span class="num">0.1</span>); <span class="note" data-note="Low variance means consistent behavior. High variance means some tasks are much harder than others—investigate those.">// consistency matters</span></span>
+<span class="line">});</span>
+<span class="line"></span>
+<span class="line"><span class="cmt">// With 100 runs at 80% success:</span></span>
+<span class="line"><span class="cmt">// 95% confidence interval is [72%, 88%]</span></span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 7: Operations -->
+    <section id="ops" class="section">
+      <header class="section__header">
+        <span class="section__number">07</span>
+        <h2 class="section__title">Operations</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">The agent loop is easy. Retries, rate limits, circuit breakers, and monitoring take the real work.</p>
+
+        <h3>Why demos work and production fails</h3>
+        <p>Your demo ran once on a good network with a responsive API. Production runs thousands of times with timeouts, rate limits, and services that go down at 3am.</p>
+
+        <blockquote class="quote">
+          "Agents that work in demos die in production. The difference is infrastructure."
+        </blockquote>
+
+        <h3>What you need</h3>
+        <ul class="list">
+          <li><strong>Exponential Backoff:</strong> When a call fails, wait longer before retrying. Add randomness so you don't hit the API at the same time as everyone else.</li>
+          <li><strong>Circuit Breaker:</strong> If a service fails 5 times in a row, stop calling it for a minute. Don't waste resources on something that's down.</li>
+          <li><strong>Rate Limiting:</strong> Agents can make unbounded requests. Put a ceiling on it.</li>
+          <li><strong>Health Checks:</strong> Know when things break before your users tell you.</li>
+        </ul>
+
+        <div class="code-block" data-title="ops.ts">
+          <pre><code><span class="line"><span class="cmt">// Backoff with randomness (exponential backoff + jitter)</span></span>
+<span class="line"><span class="kw">async function</span> <span class="fn">withRetry</span>&lt;T&gt;( <span class="note" data-note="Generic retry wrapper. Wrap any async operation to add automatic retries with exponential backoff. This is ops layer, not agent logic.">// infrastructure</span></span>
+<span class="line">  fn: () => <span class="type">Promise&lt;T&gt;</span>,</span>
+<span class="line">  config: <span class="type">RetryConfig</span></span>
+<span class="line">): <span class="type">Promise&lt;T&gt;</span> {</span>
+<span class="line">  <span class="kw">for</span> (<span class="kw">let</span> attempt = <span class="num">0</span>; attempt < config.maxAttempts; attempt++) {</span>
+<span class="line">    <span class="kw">try</span> {</span>
+<span class="line">      <span class="kw">return await</span> <span class="fn">fn</span>(); <span class="note" data-note="Try the operation. If it succeeds, return immediately. Most calls succeed on first try—don't add overhead to the happy path.">// happy path</span></span>
+<span class="line">    } <span class="kw">catch</span> (error) {</span>
+<span class="line">      <span class="kw">if</span> (!<span class="fn">isRetryable</span>(error)) <span class="kw">throw</span> error; <span class="note" data-note="Not all errors are retryable. 400 Bad Request won't succeed on retry. 500 Server Error might. 429 Rate Limited definitely should.">// fail fast on permanent errors</span></span>
+<span class="line"></span>
+<span class="line">      <span class="kw">const</span> base = config.baseDelay * Math.<span class="fn">pow</span>(<span class="num">2</span>, attempt); <span class="note" data-note="Exponential: 1s, 2s, 4s, 8s... This gives the server time to recover. Linear backoff doesn't back off fast enough.">// exponential</span></span>
+<span class="line">      <span class="kw">const</span> jitter = Math.<span class="fn">random</span>() * config.baseDelay; <span class="note" data-note="Jitter prevents thundering herd: if 1000 clients all retry at exactly 2s, they all hit the server at once. Random spread fixes this.">// prevent thundering herd</span></span>
+<span class="line"></span>
+<span class="line">      <span class="kw">await</span> <span class="fn">sleep</span>(base + jitter);</span>
+<span class="line">    }</span>
+<span class="line">  }</span>
+<span class="line">}</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 8: Orchestration -->
+    <section id="orchestration" class="section">
+      <header class="section__header">
+        <span class="section__number">08</span>
+        <h2 class="section__title">Orchestration</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">One coordinator hands out work. Workers do the work. Workers never hand out more work.</p>
+
+        <h3>Why one level</h3>
+        <p>Let workers spawn their own workers and you get:</p>
+        <ul class="list">
+          <li>Costs that multiply at each level</li>
+          <li>Latency that hides until everything times out at once</li>
+          <li>Debugging that requires tracing every branch of every branch</li>
+        </ul>
+        <p>One team let agents spawn agents. Their bill hit <strong>$2000/day</strong> before they noticed.</p>
+
+        <blockquote class="quote">
+          "You talk to the foreman, not the workers."
+        </blockquote>
+
+        <h3>The pattern</h3>
+        <p>A coordinator breaks down the task and assigns pieces to workers. Workers execute and return results. The coordinator combines results. That's it.</p>
+
+        <div class="code-block" data-title="orchestration.ts">
+          <pre><code><span class="line"><span class="cmt">// Flat: coordinator -> workers (never workers -> workers)</span></span>
+<span class="line"><span class="kw">async function</span> <span class="fn">coordinator</span>(task) { <span class="note" data-note="The coordinator is the only entity that delegates. Workers execute and return. This keeps the call graph flat and costs predictable.">// single orchestration point</span></span>
+<span class="line">  <span class="cmt">// Break it down</span></span>
+<span class="line">  <span class="kw">const</span> subtasks = <span class="fn">analyze</span>(task); <span class="note" data-note="Analysis happens once, at the top. Don't let workers re-analyze. They should execute what they're given.">// decompose upfront</span></span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// Hand out work (one level only)</span></span>
+<span class="line">  <span class="kw">const</span> results = <span class="kw">await</span> Promise.<span class="fn">all</span>( <span class="note" data-note="Parallel execution when subtasks are independent. Use Promise.allSettled if you want partial results when some fail.">// parallel when possible</span></span>
+<span class="line">    subtasks.<span class="fn">map</span>(<span class="kw">async</span> (subtask) => {</span>
+<span class="line">      <span class="kw">const</span> worker = <span class="fn">selectWorker</span>(subtask); <span class="note" data-note="Route to specialized workers: code-writer, researcher, reviewer. Each worker is an agent optimized for one thing.">// route to specialist</span></span>
+<span class="line">      <span class="cmt">// Workers execute. They don't delegate.</span></span>
+<span class="line">      <span class="kw">return</span> worker.<span class="fn">execute</span>(subtask); <span class="note" data-note="Workers are forbidden from spawning sub-workers. If they could, you'd get exponential cost growth. One team hit $2000/day this way.">// no sub-delegation</span></span>
+<span class="line">    })</span>
+<span class="line">  );</span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// Combine and return</span></span>
+<span class="line">  <span class="kw">return</span> <span class="fn">combine</span>(results); <span class="note" data-note="The coordinator owns the final synthesis. It can re-run workers if results don't fit together. Workers never see each other's output directly.">// synthesis at top</span></span>
+<span class="line">}</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chapter 9: Complete -->
+    <section id="complete" class="section section--final">
+      <header class="section__header">
+        <span class="section__number">09</span>
+        <h2 class="section__title">Complete example</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">All of it together in one working system.</p>
+
+        <h3>The stack</h3>
+        <ol class="list list--numbered">
+          <li><strong>CLI:</strong> Parse arguments, load config, wire things up</li>
+          <li><strong>Ops:</strong> Retry logic, circuit breakers, rate limits</li>
+          <li><strong>Security:</strong> Trifecta checks, sandboxing, input sanitization</li>
+          <li><strong>Agent:</strong> The loop, tools, validation, state</li>
+        </ol>
+
+        <h3>Run it</h3>
+        <div class="code-block code-block--inline">
+          <pre><code>npx ts-node run.ts "Create a hello world program"</code></pre>
+        </div>
+
+        <h3>What you get</h3>
+        <p>A production agent. The theory goes back to 1948. The patterns come from teams running this in production today. The code is TypeScript you can read and modify.</p>
+        <p><strong>Take it and make it yours.</strong></p>
+
+        <div class="code-block" data-title="complete.ts">
+          <pre><code><span class="line"><span class="cmt">// Everything together: the complete agent architecture</span></span>
+<span class="line"></span>
+<span class="line highlighted"><span class="cmt">// The loop (Wiener, 1948)</span></span>
+<span class="line highlighted"><span class="kw">while</span> (<span class="kw">this</span>.<span class="fn">canContinue</span>()) { <span class="note" data-note="canContinue() checks: not done, within budget, no fatal errors. The loop runs until explicit completion or resource exhaustion.">// Wiener's feedback loop</span></span>
+<span class="line stochastic">  <span class="kw">const</span> response = <span class="kw">await this</span>.ops <span class="note" data-note="ops layer wraps LLM calls with retry, rate limiting, circuit breaker. The agent doesn't know about infrastructure.">// ops handles infra</span></span>
+<span class="line stochastic">    .<span class="fn">callLlm</span>(() => <span class="kw">this</span>.<span class="fn">queryLLM</span>()); <span class="note" data-note="This is the ONLY stochastic line. The LLM decides what to do. Everything else is deterministic code you wrote.">// STOCHASTIC</span></span>
+<span class="line"></span>
+<span class="line deterministic">  <span class="cmt">// Check it (deterministic)</span></span>
+<span class="line deterministic">  <span class="kw">const</span> validated = <span class="kw">await this</span>.<span class="fn">validateResponse</span>(response); <span class="note" data-note="Brooks' safety layers run here. Level 0-2 checks before any action. Fails fast on policy violations.">// Brooks' layers</span></span>
+<span class="line"></span>
+<span class="line deterministic">  <span class="cmt">// Run it</span></span>
+<span class="line deterministic">  <span class="kw">const</span> results = <span class="kw">await this</span>.<span class="fn">executeTools</span>(validated.toolCalls); <span class="note" data-note="Your code runs the tools. You control sandboxing, permissions, timeouts. The LLM only suggested; you decide what executes.">// DETERMINISTIC</span></span>
+<span class="line"></span>
+<span class="line deterministic">  <span class="cmt">// Record it (events)</span></span>
+<span class="line deterministic">  <span class="kw">this</span>.<span class="fn">updateState</span>(results); <span class="note" data-note="Event sourcing: append results to the log. State is derived. This enables replay, debugging, crash recovery.">// event sourcing</span></span>
+<span class="line">} <span class="note" data-note="The loop continues until done tool is called or resources exhausted. That's the entire architecture. Everything else is infrastructure around this.">// repeat until done</span></span>
+<span class="line"></span>
+<span class="line"><span class="cmt">// That's the architecture.</span></span></code></pre>
+        </div>
+
+        <div class="finale">
+          <p class="finale__text">The loop is the architecture.<br>Everything else is infrastructure.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Keyboard hint -->
+  <div class="hint">
+    <kbd>j</kbd>/<kbd>k</kbd> navigate
+  </div>
+
+  <script src="js/cybernetic.js"></script>
+  <script src="js/system-diagram.js"></script>
+</body>
+</html>
