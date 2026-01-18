@@ -8,7 +8,7 @@ TypeScript patterns for autonomous agents. Based on dozens of research reports a
 
 We read dozens of reports, traced ideas back 80 years, and talked to people running agents in production. They all built the same thing.
 
-[Wiener](papers/wiener-1948-cybernetics.pdf "Cybernetics: Or Control and Communication in the Animal and the Machine") described the architecture in 1948. [Ashby](papers/ashby-1956-cybernetics.pdf "An Introduction to Cybernetics") added the constraints in 1956. [Brooks](papers/brooks-1986-robust-layered.pdf "A Robust Layered Control System For A Mobile Robot") nailed the safety model in 1986. The theory was done before most of us were born.
+[Wiener](papers/wiener-1948-cybernetics.pdf "Cybernetics: Or Control and Communication in the Animal and the Machine") described the architecture in 1948. [Ashby](papers/ashby-1956-cybernetics.pdf "An Introduction to Cybernetics") added the constraints in 1956. [Brooks](papers/brooks-1986-robust-layered.pdf "A Robust Layered Control System For A Mobile Robot") nailed the safety model in 1986. [Juran](https://www.juran.com/blog/the-juran-trilogy-2/ "The Quality Trilogy") distinguished control from improvement in 1986. The theory was done before most of us were born.
 
 > "Stop trying to invent new frameworks. The frameworks exist."
 
@@ -62,7 +62,7 @@ The entire agent architecture. The stochastic part is three lines. Everything el
 
 ### Why everyone builds the same thing
 
-We looked at [Claude Code](https://github.com/anthropics/claude-code "Claude Code: Agentic coding tool"), [Loom](https://github.com/ghuntley/loom "Loom: AI-powered coding agent"), [Gas Town](https://github.com/steveyegge/gastown "Gas Town: Multi-agent workspace manager"), [Browser-Use](https://github.com/browser-use/browser-use "Browser-Use: Browser automation for AI agents"). Different teams, different companies, different years. Same architecture.
+We looked at [Claude Code](https://github.com/anthropics/claude-code "Claude Code: Agentic coding tool"), [Loom](https://github.com/ghuntley/loom "Loom: AI-powered coding agent"), [Browser-Use](https://github.com/browser-use/browser-use "Browser-Use: Browser automation for AI agents"). Different teams, different companies, different years. Same architecture.
 
 > "An agent runs tools in a loop to achieve a goal."
 > — [Simon Willison](https://simonwillison.net/2025/Sep/18/agents/ "I think 'agent' may finally have a widely enough agreed upon definition to be useful jargon now")
@@ -133,9 +133,9 @@ const getBrowserState: Tool = {
 
 Start generous. Restrict based on evidence.
 
-## 03. Validation
+## 03. Verification
 
-> The LLM gets it right maybe 70% of the time. Your validation code catches the other 30%.
+> The LLM gets it right maybe 70% of the time. Your verification code catches the other 30%.
 
 ### Do the math
 
@@ -143,11 +143,13 @@ Say each step works 70% of the time. Over 10 steps:
 
 `0.70^10 = 2.8%`
 
-Now add validation that catches 80% of mistakes:
+Now add verification that catches 80% of mistakes:
 
 `0.94^10 = 53.8%`
 
-Validation turns a useless agent into one that works half the time. Add retries and you're in business.
+Verification turns a useless agent into one that works half the time. Add retries and you're in business.
+
+**Note:** This catches *sporadic* errors—malformed output, type mismatches, policy violations. It doesn't catch *chronic waste*—500 lines for a 20-line task. For that, see Section 10.
 
 ### Safety layers (Brooks, 1986)
 
@@ -158,7 +160,7 @@ Validation turns a useless agent into one that works half the time. Add retries 
 - Layer 2: Policy checks.
 - Layer 3: The actual task.
 
-`validation.ts`
+`verification.ts`
 
 ```typescript
 // Lower layers always win (Brooks' subsumption)
@@ -443,7 +445,244 @@ while (this.canContinue()) {
 // That's the architecture.
 ```
 
-The loop is the architecture.Everything else is infrastructure.
+The loop is the architecture. Everything else is infrastructure.
+
+## 10. Quality
+
+> Validation catches errors. Quality catches slop. You can't inspect your way to good code.
+
+### Where this came from
+
+[Joseph Juran](https://www.juran.com/blog/the-juran-trilogy-2/ "The Quality Trilogy (1986)") drew the distinction in 1986. There are two kinds of problems: **sporadic spikes** (sudden errors, caught by control) and **chronic waste** (structural problems, requiring improvement). Validation catches the spikes. Quality addresses the waste.
+
+[W. Edwards Deming](https://asq.org/quality-resources/tqm/deming-points "Deming's 14 Points") said it plainly in Point 3: *"Cease dependence on inspection to achieve quality."* Inspection is too late. The quality, good or bad, is already in the product.
+
+### The distinction
+
+| Type | Question | Catches |
+| --- | --- | --- |
+| Verification | Did we build it right? | Malformed JSON, type errors |
+| Validation | Did we build the right thing? | Unauthorized actions, policy violations |
+| Quality | Should we have built it this way? | 500 lines for a 20-line task |
+
+[Barry Boehm](https://en.wikipedia.org/wiki/Software_verification_and_validation "Software V&V (1972)") named this in 1972. Most agent frameworks stop at validation. Production systems need all three.
+
+### The asymmetry problem
+
+An agent generates code in minutes. A human reviews it in hours. This asymmetry compounds:
+
+> "Only 3.4% of developers report both low hallucination rates AND high confidence in shipping AI code without human review."
+> — Qodo, *State of AI Code Quality* (2025)
+
+If review time exceeds generation time by 10x, you don't have an efficiency gain. You have a bottleneck that happens to produce a lot of output.
+
+### Quality workers
+
+In orchestration (Section 08), add independent quality review. Workers implement. Quality workers verify.
+
+`quality-workers.ts`
+
+```typescript
+// Quality workers: independent review in orchestration
+async function coordinator(task) {
+  const subtasks = analyze(task);
+
+  const results = await Promise.all(
+    subtasks.map(async (subtask) => {
+      // Implementation worker
+      const worker = selectWorker(subtask);
+      const result = await worker.execute(subtask);
+
+      // Quality worker (independent)
+      const reviewer = selectQualityWorker(subtask);
+      const review = await reviewer.assess(result, subtask);
+
+      if (!review.acceptable) {
+        return worker.revise(result, review.findings);
+      }
+      return result;
+    })
+  );
+
+  return combine(results);
+}
+```
+
+The quality worker is not the same as the implementation worker. Different prompt, different role, different incentives.
+
+### Four eyes principle
+
+For high-risk outputs, require two independent assessments before action. This comes from banking and regulated industries where single points of failure cause disasters.
+
+`four-eyes.ts`
+
+```typescript
+// Four eyes: dual control for high-risk actions
+async function executeWithDualControl(
+  action: Action,
+  context: Context
+): Promise<Result> {
+  if (!isHighRisk(action)) {
+    return execute(action);
+  }
+
+  // First assessment
+  const review1 = await assessRisk(action, context);
+
+  // Second assessment (independent)
+  const review2 = await assessRisk(action, {
+    ...context,
+    priorAssessment: null, // Don't bias second reviewer
+  });
+
+  // Both must approve
+  if (review1.approved && review2.approved) {
+    return execute(action);
+  }
+
+  return {
+    blocked: true,
+    reasons: [...review1.concerns, ...review2.concerns],
+  };
+}
+```
+
+### ALCOA: Traceability for agent decisions
+
+The pharmaceutical industry uses [ALCOA principles](https://www.quanticate.com/blog/alcoa-principles "ALCOA Data Integrity") for data integrity. Every decision must be:
+
+- **Attributable**: Who (or what) made this decision?
+- **Legible**: Can we read and understand it?
+- **Contemporaneous**: Recorded when it happened, not reconstructed later
+- **Original**: The first recording, not a copy
+- **Accurate**: Reflects what actually occurred
+
+`alcoa.ts`
+
+```typescript
+// ALCOA-compliant action record
+interface AuditableAction {
+  // Attributable
+  actor: {
+    type: 'agent' | 'human' | 'system';
+    id: string;
+    model?: string; // For agents: which model version
+  };
+
+  // Legible
+  action: {
+    type: string;
+    description: string; // Human-readable
+    parameters: Record<string, unknown>;
+  };
+
+  // Contemporaneous
+  timestamp: {
+    initiated: Date;
+    completed: Date;
+  };
+
+  // Original
+  id: string; // Immutable identifier
+  sequence: number; // Order in event log
+
+  // Accurate
+  outcome: {
+    success: boolean;
+    result?: unknown;
+    error?: string;
+  };
+  checksums: {
+    input: string;
+    output: string;
+  };
+}
+```
+
+### Chronic waste metrics
+
+Track quality over time. These metrics surface chronic waste that validation misses:
+
+- **Code churn**: Percentage rewritten within 2 weeks. High churn means the first output wasn't right.
+- **Proportionality**: Actual lines vs. expected lines. 500 lines for a 20-line task is a quality problem.
+- **Review time ratio**: Hours to review vs. minutes to generate. If this exceeds 10:1, the agent creates more work than it saves.
+- **Defect escape rate**: Issues found after merge vs. before. Quality catches problems early.
+
+`quality-metrics.ts`
+
+```typescript
+// Quality metrics: track chronic waste
+interface QualityMetrics {
+  // Code churn: rewrites indicate poor initial quality
+  churn: {
+    linesChanged: number;
+    linesTotal: number;
+    withinDays: number;
+    rate: number; // linesChanged / linesTotal
+  };
+
+  // Proportionality: output size vs expected
+  proportionality: {
+    actualLines: number;
+    expectedLines: number;
+    ratio: number; // actual / expected
+  };
+
+  // Review burden: human time vs machine time
+  reviewBurden: {
+    generationMinutes: number;
+    reviewMinutes: number;
+    ratio: number; // review / generation
+  };
+
+  // Defect escape: issues found late
+  defectEscape: {
+    foundBeforeMerge: number;
+    foundAfterMerge: number;
+    escapeRate: number; // after / (before + after)
+  };
+}
+
+function assessQualityHealth(metrics: QualityMetrics): QualityAssessment {
+  const concerns: string[] = [];
+
+  if (metrics.churn.rate > 0.3) {
+    concerns.push('High code churn suggests poor initial output');
+  }
+  if (metrics.proportionality.ratio > 5) {
+    concerns.push('Output significantly larger than expected');
+  }
+  if (metrics.reviewBurden.ratio > 10) {
+    concerns.push('Review time exceeds generation time by 10x');
+  }
+  if (metrics.defectEscape.escapeRate > 0.2) {
+    concerns.push('Too many defects escaping to production');
+  }
+
+  return {
+    healthy: concerns.length === 0,
+    concerns,
+  };
+}
+```
+
+### The Toyota principle
+
+[Toyota's production system](https://www.6sigma.us/manufacturing/jidoka-toyota-production-system/ "Jidoka") gives every worker the authority to stop the line when they see a defect. This is called **jidoka**: automation with a human touch.
+
+For agents: any quality check that fails should stop the pipeline. Don't let bad output accumulate downstream hoping someone will catch it later.
+
+```typescript
+// Jidoka: stop the line on quality failure
+if (!qualityCheck.passed) {
+  throw new QualityStop({
+    reason: qualityCheck.findings,
+    action: 'Review required before continuing',
+  });
+}
+```
+
+The point isn't to slow things down. The point is that fixing problems at the source is cheaper than fixing them downstream.
 
 ---
 

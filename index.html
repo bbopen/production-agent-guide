@@ -32,13 +32,14 @@
     <a href="#principles" class="nav-link" data-section="2">P</a>
     <a href="#loop" class="nav-link" data-section="3">01</a>
     <a href="#tools" class="nav-link" data-section="4">02</a>
-    <a href="#validation" class="nav-link" data-section="5">03</a>
+    <a href="#verification" class="nav-link" data-section="5">03</a>
     <a href="#state" class="nav-link" data-section="6">04</a>
     <a href="#security" class="nav-link" data-section="7">05</a>
     <a href="#evaluation" class="nav-link" data-section="8">06</a>
     <a href="#ops" class="nav-link" data-section="9">07</a>
     <a href="#orchestration" class="nav-link" data-section="10">08</a>
     <a href="#complete" class="nav-link" data-section="11">09</a>
+    <a href="#quality" class="nav-link" data-section="12">10</a>
   </nav>
 
   <main class="main">
@@ -80,7 +81,7 @@
       <div class="content">
         <p>We read dozens of reports, traced ideas back 80 years, and talked to people running agents in production. They all built the same thing.</p>
 
-        <p><a href="papers/wiener-1948-cybernetics.pdf" class="citation" title="Cybernetics: Or Control and Communication in the Animal and the Machine"><span class="highlight--cyan">Wiener</span></a> described the architecture in <span class="highlight--coral">1948</span>. <a href="papers/ashby-1956-cybernetics.pdf" class="citation" title="An Introduction to Cybernetics"><span class="highlight--cyan">Ashby</span></a> added the constraints in <span class="highlight--coral">1956</span>. <a href="papers/brooks-1986-robust-layered.pdf" class="citation" title="A Robust Layered Control System For A Mobile Robot"><span class="highlight--cyan">Brooks</span></a> nailed the safety model in <span class="highlight--coral">1986</span>. The theory was done before most of us were born.</p>
+        <p><a href="papers/wiener-1948-cybernetics.pdf" class="citation" title="Cybernetics: Or Control and Communication in the Animal and the Machine"><span class="highlight--cyan">Wiener</span></a> described the architecture in <span class="highlight--coral">1948</span>. <a href="papers/ashby-1956-cybernetics.pdf" class="citation" title="An Introduction to Cybernetics"><span class="highlight--cyan">Ashby</span></a> added the constraints in <span class="highlight--coral">1956</span>. <a href="papers/brooks-1986-robust-layered.pdf" class="citation" title="A Robust Layered Control System For A Mobile Robot"><span class="highlight--cyan">Brooks</span></a> nailed the safety model in <span class="highlight--coral">1986</span>. <a href="https://www.juran.com/blog/the-juran-trilogy-2/" class="citation" title="The Quality Trilogy"><span class="highlight--cyan">Juran</span></a> distinguished control from improvement in <span class="highlight--coral">1986</span>. The theory was done before most of us were born.</p>
 
         <blockquote class="quote">
           "Stop trying to invent new frameworks. The frameworks exist."
@@ -140,7 +141,7 @@
         <p><a href="papers/wiener-1948-cybernetics.pdf" class="citation" title="Cybernetics: Or Control and Communication in the Animal and the Machine (1948)"><span class="highlight--cyan">Norbert Wiener</span></a> drew feedback loops in 1948 when he was working on anti-aircraft guns. The target moves, you observe, you adjust. Control systems have looked like this ever since.</p>
 
         <h3>Why everyone builds the same thing</h3>
-        <p>We looked at <a href="https://github.com/anthropics/claude-code" class="citation" title="Claude Code: Agentic coding tool">Claude Code</a>, <a href="https://github.com/ghuntley/loom" class="citation" title="Loom: AI-powered coding agent">Loom</a>, <a href="https://github.com/steveyegge/gastown" class="citation" title="Gas Town: Multi-agent workspace manager">Gas Town</a>, <a href="https://github.com/browser-use/browser-use" class="citation" title="Browser-Use: Browser automation for AI agents">Browser-Use</a>. Different teams, different companies, different years. Same architecture.</p>
+        <p>We looked at <a href="https://github.com/anthropics/claude-code" class="citation" title="Claude Code: Agentic coding tool">Claude Code</a>, <a href="https://github.com/ghuntley/loom" class="citation" title="Loom: AI-powered coding agent">Loom</a>, <a href="https://github.com/browser-use/browser-use" class="citation" title="Browser-Use: Browser automation for AI agents">Browser-Use</a>. Different teams, different companies, different years. Same architecture.</p>
 
         <blockquote class="quote">
           "An agent runs tools in a loop to achieve a goal."
@@ -214,22 +215,23 @@
       </div>
     </section>
 
-    <!-- Chapter 3: Validation -->
-    <section id="validation" class="section">
+    <!-- Chapter 3: Verification -->
+    <section id="verification" class="section">
       <header class="section__header">
         <span class="section__number">03</span>
-        <h2 class="section__title">Validation</h2>
+        <h2 class="section__title">Verification</h2>
       </header>
 
       <div class="content">
-        <p class="lede">The LLM gets it right maybe 70% of the time. Your validation code catches the other 30%.</p>
+        <p class="lede">The LLM gets it right maybe 70% of the time. Your verification code catches the other 30%.</p>
 
         <h3>Do the math</h3>
         <p>Say each step works 70% of the time. Over 10 steps:</p>
         <p class="math"><code class="inline-code">0.70^10 = 2.8%</code></p>
-        <p>Now add validation that catches 80% of mistakes:</p>
+        <p>Now add verification that catches 80% of mistakes:</p>
         <p class="math"><code class="inline-code">0.94^10 = 53.8%</code></p>
-        <p>Validation turns a useless agent into one that works half the time. Add retries and you're in business.</p>
+        <p>Verification turns a useless agent into one that works half the time. Add retries and you're in business.</p>
+        <p class="note-callout"><strong>Note:</strong> This catches <em>sporadic</em> errors—malformed output, type mismatches, policy violations. It doesn't catch <em>chronic waste</em>—500 lines for a 20-line task. For that, see Section 10.</p>
 
         <h3>Safety layers (Brooks, 1986)</h3>
         <p><a href="papers/brooks-1986-robust-layered.pdf" class="citation" title="A Robust Layered Control System For A Mobile Robot"><span class="highlight--cyan">Rodney Brooks</span></a> built robots at MIT. His rule: lower layers override higher layers. Safety beats efficiency. Efficiency beats the goal. The goal never overrides safety.</p>
@@ -241,7 +243,7 @@
           <li><span class="layer layer--3">Layer 3:</span> The actual task.</li>
         </ul>
 
-        <div class="code-block" data-title="validation.ts">
+        <div class="code-block" data-title="verification.ts">
           <pre><code><span class="line"><span class="cmt">// Lower layers always win (Brooks' subsumption)</span></span>
 <span class="line"><span class="kw">const</span> safetyLayers = [ <span class="note" data-note="Brooks' subsumption architecture: lower-numbered layers have priority. Layer 0 can veto anything. Layer 3 only runs if 0-2 all pass.">// priority order</span></span>
 <span class="line">  {</span>
@@ -577,6 +579,198 @@
         <div class="finale">
           <p class="finale__text">The loop is the architecture.<br>Everything else is infrastructure.</p>
         </div>
+      </div>
+    </section>
+
+    <!-- Chapter 10: Quality -->
+    <section id="quality" class="section">
+      <header class="section__header">
+        <span class="section__number">10</span>
+        <h2 class="section__title">Quality</h2>
+      </header>
+
+      <div class="content">
+        <p class="lede">Verification catches errors. Quality catches slop. You can't inspect your way to good code.</p>
+
+        <h3>Where this came from</h3>
+        <p><a href="https://www.juran.com/blog/the-juran-trilogy-2/" class="citation" title="The Quality Trilogy (1986)"><span class="highlight--cyan">Joseph Juran</span></a> drew the distinction in <span class="highlight--coral">1986</span>. There are two kinds of problems: <strong>sporadic spikes</strong> (sudden errors, caught by control) and <strong>chronic waste</strong> (structural problems, requiring improvement). Verification catches the spikes. Quality addresses the waste.</p>
+
+        <p><a href="https://asq.org/quality-resources/tqm/deming-points" class="citation" title="Deming's 14 Points"><span class="highlight--cyan">W. Edwards Deming</span></a> said it plainly in Point 3: <em>"Cease dependence on inspection to achieve quality."</em> Inspection is too late. The quality, good or bad, is already in the product.</p>
+
+        <h3>The distinction</h3>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Question</th>
+              <th>Catches</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Verification</td>
+              <td>Did we build it right?</td>
+              <td>Malformed JSON, type errors</td>
+            </tr>
+            <tr>
+              <td>Validation</td>
+              <td>Did we build the right thing?</td>
+              <td>Unauthorized actions, policy violations</td>
+            </tr>
+            <tr>
+              <td>Quality</td>
+              <td>Should we have built it this way?</td>
+              <td>500 lines for a 20-line task</td>
+            </tr>
+          </tbody>
+        </table>
+        <p><a href="https://en.wikipedia.org/wiki/Software_verification_and_validation" class="citation" title="Software V&V (1972)"><span class="highlight--cyan">Barry Boehm</span></a> named this in <span class="highlight--coral">1972</span>. Most agent frameworks stop at validation. Production systems need all three.</p>
+
+        <h3>The asymmetry problem</h3>
+        <p>An agent generates code in minutes. A human reviews it in hours. This asymmetry compounds:</p>
+        <blockquote class="quote">
+          "Only 3.4% of developers report both low hallucination rates AND high confidence in shipping AI code without human review."
+          <cite>— Qodo, <em>State of AI Code Quality</em> (2025)</cite>
+        </blockquote>
+        <p>If review time exceeds generation time by 10x, you don't have an efficiency gain. You have a bottleneck that happens to produce a lot of output.</p>
+
+        <h3>Quality workers</h3>
+        <p>In orchestration (Section 08), add independent quality review. Workers implement. Quality workers verify.</p>
+
+        <div class="code-block" data-title="quality-workers.ts">
+          <pre><code><span class="line"><span class="cmt">// Quality workers: independent review in orchestration</span></span>
+<span class="line"><span class="kw">async function</span> <span class="fn">coordinator</span>(task) {</span>
+<span class="line">  <span class="kw">const</span> subtasks = <span class="fn">analyze</span>(task);</span>
+<span class="line"></span>
+<span class="line">  <span class="kw">const</span> results = <span class="kw">await</span> Promise.<span class="fn">all</span>(</span>
+<span class="line">    subtasks.<span class="fn">map</span>(<span class="kw">async</span> (subtask) => {</span>
+<span class="line">      <span class="cmt">// Implementation worker</span></span>
+<span class="line">      <span class="kw">const</span> worker = <span class="fn">selectWorker</span>(subtask);</span>
+<span class="line">      <span class="kw">const</span> result = <span class="kw">await</span> worker.<span class="fn">execute</span>(subtask);</span>
+<span class="line"></span>
+<span class="line highlighted">      <span class="cmt">// Quality worker (independent)</span> <span class="note" data-note="Different prompt, different role, different incentives. The quality worker's job is to find problems, not to implement.">// separate from impl</span></span>
+<span class="line highlighted">      <span class="kw">const</span> reviewer = <span class="fn">selectQualityWorker</span>(subtask);</span>
+<span class="line highlighted">      <span class="kw">const</span> review = <span class="kw">await</span> reviewer.<span class="fn">assess</span>(result, subtask);</span>
+<span class="line"></span>
+<span class="line">      <span class="kw">if</span> (!review.acceptable) {</span>
+<span class="line">        <span class="kw">return</span> worker.<span class="fn">revise</span>(result, review.findings);</span>
+<span class="line">      }</span>
+<span class="line">      <span class="kw">return</span> result;</span>
+<span class="line">    })</span>
+<span class="line">  );</span>
+<span class="line"></span>
+<span class="line">  <span class="kw">return</span> <span class="fn">combine</span>(results);</span>
+<span class="line">}</span></code></pre>
+        </div>
+        <p>The quality worker is not the same as the implementation worker. Different prompt, different role, different incentives.</p>
+
+        <h3>Four eyes principle</h3>
+        <p>For high-risk outputs, require two independent assessments before action. This comes from banking and regulated industries where single points of failure cause disasters.</p>
+
+        <div class="code-block" data-title="four-eyes.ts">
+          <pre><code><span class="line"><span class="cmt">// Four eyes: dual control for high-risk actions</span></span>
+<span class="line"><span class="kw">async function</span> <span class="fn">executeWithDualControl</span>(</span>
+<span class="line">  action: <span class="type">Action</span>,</span>
+<span class="line">  context: <span class="type">Context</span></span>
+<span class="line">): <span class="type">Promise&lt;Result&gt;</span> {</span>
+<span class="line">  <span class="kw">if</span> (!<span class="fn">isHighRisk</span>(action)) {</span>
+<span class="line">    <span class="kw">return</span> <span class="fn">execute</span>(action);</span>
+<span class="line">  }</span>
+<span class="line"></span>
+<span class="line highlighted">  <span class="cmt">// First assessment</span></span>
+<span class="line highlighted">  <span class="kw">const</span> review1 = <span class="kw">await</span> <span class="fn">assessRisk</span>(action, context);</span>
+<span class="line"></span>
+<span class="line highlighted">  <span class="cmt">// Second assessment (independent)</span> <span class="note" data-note="Don't bias the second reviewer with the first assessment. Independent evaluation catches different things.">// no bias</span></span>
+<span class="line highlighted">  <span class="kw">const</span> review2 = <span class="kw">await</span> <span class="fn">assessRisk</span>(action, {</span>
+<span class="line highlighted">    ...context,</span>
+<span class="line highlighted">    priorAssessment: <span class="kw">null</span>,</span>
+<span class="line highlighted">  });</span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// Both must approve</span></span>
+<span class="line">  <span class="kw">if</span> (review1.approved && review2.approved) {</span>
+<span class="line">    <span class="kw">return</span> <span class="fn">execute</span>(action);</span>
+<span class="line">  }</span>
+<span class="line"></span>
+<span class="line">  <span class="kw">return</span> {</span>
+<span class="line">    blocked: <span class="kw">true</span>,</span>
+<span class="line">    reasons: [...review1.concerns, ...review2.concerns],</span>
+<span class="line">  };</span>
+<span class="line">}</span></code></pre>
+        </div>
+
+        <h3>ALCOA: Traceability for agent decisions</h3>
+        <p>The pharmaceutical industry uses <a href="https://www.quanticate.com/blog/alcoa-principles" class="citation" title="ALCOA Data Integrity">ALCOA principles</a> for data integrity. Every decision must be:</p>
+        <ul class="list">
+          <li><strong>Attributable:</strong> Who (or what) made this decision?</li>
+          <li><strong>Legible:</strong> Can we read and understand it?</li>
+          <li><strong>Contemporaneous:</strong> Recorded when it happened, not reconstructed later</li>
+          <li><strong>Original:</strong> The first recording, not a copy</li>
+          <li><strong>Accurate:</strong> Reflects what actually occurred</li>
+        </ul>
+
+        <div class="code-block" data-title="alcoa.ts">
+          <pre><code><span class="line"><span class="cmt">// ALCOA-compliant action record</span></span>
+<span class="line"><span class="kw">interface</span> <span class="type">AuditableAction</span> {</span>
+<span class="line">  <span class="cmt">// Attributable</span></span>
+<span class="line">  actor: {</span>
+<span class="line">    type: <span class="str">'agent'</span> | <span class="str">'human'</span> | <span class="str">'system'</span>;</span>
+<span class="line">    id: <span class="type">string</span>;</span>
+<span class="line">    model?: <span class="type">string</span>; <span class="note" data-note="For agents: which model version made this decision? Critical for debugging and accountability.">// which version</span></span>
+<span class="line">  };</span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// Legible</span></span>
+<span class="line">  action: {</span>
+<span class="line">    type: <span class="type">string</span>;</span>
+<span class="line">    description: <span class="type">string</span>; <span class="cmt">// Human-readable</span></span>
+<span class="line">    parameters: <span class="type">Record&lt;string, unknown&gt;</span>;</span>
+<span class="line">  };</span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// Contemporaneous</span></span>
+<span class="line">  timestamp: {</span>
+<span class="line">    initiated: <span class="type">Date</span>;</span>
+<span class="line">    completed: <span class="type">Date</span>;</span>
+<span class="line">  };</span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// Original</span></span>
+<span class="line">  id: <span class="type">string</span>; <span class="cmt">// Immutable identifier</span></span>
+<span class="line">  sequence: <span class="type">number</span>; <span class="cmt">// Order in event log</span></span>
+<span class="line"></span>
+<span class="line">  <span class="cmt">// Accurate</span></span>
+<span class="line">  outcome: {</span>
+<span class="line">    success: <span class="type">boolean</span>;</span>
+<span class="line">    result?: <span class="type">unknown</span>;</span>
+<span class="line">    error?: <span class="type">string</span>;</span>
+<span class="line">  };</span>
+<span class="line">  checksums: {</span>
+<span class="line">    input: <span class="type">string</span>;</span>
+<span class="line">    output: <span class="type">string</span>;</span>
+<span class="line">  };</span>
+<span class="line">}</span></code></pre>
+        </div>
+
+        <h3>Chronic waste metrics</h3>
+        <p>Track quality over time. These metrics surface chronic waste that verification misses:</p>
+        <ul class="list">
+          <li><strong>Code churn:</strong> Percentage rewritten within 2 weeks. High churn means the first output wasn't right.</li>
+          <li><strong>Proportionality:</strong> Actual lines vs. expected lines. 500 lines for a 20-line task is a quality problem.</li>
+          <li><strong>Review time ratio:</strong> Hours to review vs. minutes to generate. If this exceeds 10:1, the agent creates more work than it saves.</li>
+          <li><strong>Defect escape rate:</strong> Issues found after merge vs. before. Quality catches problems early.</li>
+        </ul>
+
+        <h3>The Toyota principle</h3>
+        <p><a href="https://www.6sigma.us/manufacturing/jidoka-toyota-production-system/" class="citation" title="Jidoka">Toyota's production system</a> gives every worker the authority to stop the line when they see a defect. This is called <strong>jidoka</strong>: automation with a human touch.</p>
+        <p>For agents: any quality check that fails should stop the pipeline. Don't let bad output accumulate downstream hoping someone will catch it later.</p>
+
+        <div class="code-block code-block--inline">
+          <pre><code><span class="line highlighted"><span class="cmt">// Jidoka: stop the line on quality failure</span></span>
+<span class="line highlighted"><span class="kw">if</span> (!qualityCheck.passed) {</span>
+<span class="line highlighted">  <span class="kw">throw new</span> <span class="fn">QualityStop</span>({</span>
+<span class="line highlighted">    reason: qualityCheck.findings,</span>
+<span class="line highlighted">    action: <span class="str">'Review required before continuing'</span>,</span>
+<span class="line highlighted">  });</span>
+<span class="line highlighted">}</span></code></pre>
+        </div>
+        <p>The point isn't to slow things down. The point is that fixing problems at the source is cheaper than fixing them downstream.</p>
       </div>
     </section>
   </main>
