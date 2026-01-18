@@ -462,95 +462,6 @@ async function coordinator(task) {
 
 The quality worker is not the same as the implementation worker. Different prompt, different role, different incentives.
 
-### Four eyes principle
-
-For high-risk outputs, require two independent assessments before action. This comes from banking and regulated industries where single points of failure cause disasters.
-
-`four-eyes.ts`
-
-```typescript
-// Four eyes: dual control for high-risk actions
-async function executeWithDualControl(
-  action: Action,
-  context: Context
-): Promise<Result> {
-  if (!isHighRisk(action)) {
-    return execute(action);
-  }
-
-  // First assessment
-  const review1 = await assessRisk(action, context);
-
-  // Second assessment (independent)
-  const review2 = await assessRisk(action, {
-    ...context,
-    priorAssessment: null, // Don't bias second reviewer
-  });
-
-  // Both must approve
-  if (review1.approved && review2.approved) {
-    return execute(action);
-  }
-
-  return {
-    blocked: true,
-    reasons: [...review1.concerns, ...review2.concerns],
-  };
-}
-```
-
-### ALCOA: Traceability for agent decisions
-
-The pharmaceutical industry uses [ALCOA principles](https://www.quanticate.com/blog/alcoa-principles "ALCOA Data Integrity") for data integrity. Every decision must be:
-
-- **Attributable**: Who (or what) made this decision?
-- **Legible**: Can we read and understand it?
-- **Contemporaneous**: Recorded when it happened, not reconstructed later
-- **Original**: The first recording, not a copy
-- **Accurate**: Reflects what actually occurred
-
-`alcoa.ts`
-
-```typescript
-// ALCOA-compliant action record
-interface AuditableAction {
-  // Attributable
-  actor: {
-    type: 'agent' | 'human' | 'system';
-    id: string;
-    model?: string; // For agents: which model version
-  };
-
-  // Legible
-  action: {
-    type: string;
-    description: string; // Human-readable
-    parameters: Record<string, unknown>;
-  };
-
-  // Contemporaneous
-  timestamp: {
-    initiated: Date;
-    completed: Date;
-  };
-
-  // Original
-  id: string; // Immutable identifier
-  sequence: number; // Order in event log
-
-  // Accurate
-  outcome: {
-    success: boolean;
-    result?: unknown;
-    error?: string;
-  };
-  checksums: {
-    input: string;
-    output: string;
-  };
-}
-```
-
 ### Chronic waste metrics
 
 Track quality over time. These metrics surface chronic waste that validation misses:
@@ -684,7 +595,7 @@ while (this.canContinue()) {
     continue;
   }
 
-  // Record it (events, ALCOA-compliant)
+  // Record it (event sourcing)
   this.updateState(results, quality);
 }
 

@@ -610,90 +610,6 @@
         </div>
         <p>The quality worker is not the same as the implementation worker. Different prompt, different role, different incentives.</p>
 
-        <h3>Four eyes principle</h3>
-        <p>For high-risk outputs, require two independent assessments before action. This comes from banking and regulated industries where single points of failure cause disasters.</p>
-
-        <div class="code-block" data-title="four-eyes.ts">
-          <pre><code><span class="line"><span class="cmt">// Four eyes: dual control for high-risk actions</span></span>
-<span class="line"><span class="kw">async function</span> <span class="fn">executeWithDualControl</span>(</span>
-<span class="line">  action: <span class="type">Action</span>,</span>
-<span class="line">  context: <span class="type">Context</span></span>
-<span class="line">): <span class="type">Promise&lt;Result&gt;</span> {</span>
-<span class="line">  <span class="kw">if</span> (!<span class="fn">isHighRisk</span>(action)) {</span>
-<span class="line">    <span class="kw">return</span> <span class="fn">execute</span>(action);</span>
-<span class="line">  }</span>
-<span class="line"></span>
-<span class="line highlighted">  <span class="cmt">// First assessment</span></span>
-<span class="line highlighted">  <span class="kw">const</span> review1 = <span class="kw">await</span> <span class="fn">assessRisk</span>(action, context);</span>
-<span class="line"></span>
-<span class="line highlighted">  <span class="cmt">// Second assessment (independent)</span> <span class="note" data-note="Don't bias the second reviewer with the first assessment. Independent evaluation catches different things.">// no bias</span></span>
-<span class="line highlighted">  <span class="kw">const</span> review2 = <span class="kw">await</span> <span class="fn">assessRisk</span>(action, {</span>
-<span class="line highlighted">    ...context,</span>
-<span class="line highlighted">    priorAssessment: <span class="kw">null</span>,</span>
-<span class="line highlighted">  });</span>
-<span class="line"></span>
-<span class="line">  <span class="cmt">// Both must approve</span></span>
-<span class="line">  <span class="kw">if</span> (review1.approved && review2.approved) {</span>
-<span class="line">    <span class="kw">return</span> <span class="fn">execute</span>(action);</span>
-<span class="line">  }</span>
-<span class="line"></span>
-<span class="line">  <span class="kw">return</span> {</span>
-<span class="line">    blocked: <span class="kw">true</span>,</span>
-<span class="line">    reasons: [...review1.concerns, ...review2.concerns],</span>
-<span class="line">  };</span>
-<span class="line">}</span></code></pre>
-        </div>
-
-        <h3>ALCOA: Traceability for agent decisions</h3>
-        <p>The pharmaceutical industry uses <a href="https://www.quanticate.com/blog/alcoa-principles" class="citation" title="ALCOA Data Integrity">ALCOA principles</a> for data integrity. Every decision must be:</p>
-        <ul class="list">
-          <li><strong>Attributable:</strong> Who (or what) made this decision?</li>
-          <li><strong>Legible:</strong> Can we read and understand it?</li>
-          <li><strong>Contemporaneous:</strong> Recorded when it happened, not reconstructed later</li>
-          <li><strong>Original:</strong> The first recording, not a copy</li>
-          <li><strong>Accurate:</strong> Reflects what actually occurred</li>
-        </ul>
-
-        <div class="code-block" data-title="alcoa.ts">
-          <pre><code><span class="line"><span class="cmt">// ALCOA-compliant action record</span></span>
-<span class="line"><span class="kw">interface</span> <span class="type">AuditableAction</span> {</span>
-<span class="line">  <span class="cmt">// Attributable</span></span>
-<span class="line">  actor: {</span>
-<span class="line">    type: <span class="str">'agent'</span> | <span class="str">'human'</span> | <span class="str">'system'</span>;</span>
-<span class="line">    id: <span class="type">string</span>;</span>
-<span class="line">    model?: <span class="type">string</span>; <span class="note" data-note="For agents: which model version made this decision? Critical for debugging and accountability.">// which version</span></span>
-<span class="line">  };</span>
-<span class="line"></span>
-<span class="line">  <span class="cmt">// Legible</span></span>
-<span class="line">  action: {</span>
-<span class="line">    type: <span class="type">string</span>;</span>
-<span class="line">    description: <span class="type">string</span>; <span class="cmt">// Human-readable</span></span>
-<span class="line">    parameters: <span class="type">Record&lt;string, unknown&gt;</span>;</span>
-<span class="line">  };</span>
-<span class="line"></span>
-<span class="line">  <span class="cmt">// Contemporaneous</span></span>
-<span class="line">  timestamp: {</span>
-<span class="line">    initiated: <span class="type">Date</span>;</span>
-<span class="line">    completed: <span class="type">Date</span>;</span>
-<span class="line">  };</span>
-<span class="line"></span>
-<span class="line">  <span class="cmt">// Original</span></span>
-<span class="line">  id: <span class="type">string</span>; <span class="cmt">// Immutable identifier</span></span>
-<span class="line">  sequence: <span class="type">number</span>; <span class="cmt">// Order in event log</span></span>
-<span class="line"></span>
-<span class="line">  <span class="cmt">// Accurate</span></span>
-<span class="line">  outcome: {</span>
-<span class="line">    success: <span class="type">boolean</span>;</span>
-<span class="line">    result?: <span class="type">unknown</span>;</span>
-<span class="line">    error?: <span class="type">string</span>;</span>
-<span class="line">  };</span>
-<span class="line">  checksums: {</span>
-<span class="line">    input: <span class="type">string</span>;</span>
-<span class="line">    output: <span class="type">string</span>;</span>
-<span class="line">  };</span>
-<span class="line">}</span></code></pre>
-        </div>
-
         <h3>Chronic waste metrics</h3>
         <p>Track quality over time. These metrics surface chronic waste that verification misses:</p>
         <ul class="list">
@@ -769,8 +685,8 @@
 <span class="line deterministic">    <span class="kw">continue</span>;</span>
 <span class="line deterministic">  }</span>
 <span class="line"></span>
-<span class="line deterministic">  <span class="cmt">// Record it (ALCOA-compliant)</span></span>
-<span class="line deterministic">  <span class="kw">this</span>.<span class="fn">updateState</span>(results, quality); <span class="note" data-note="Event sourcing with ALCOA: attributable, legible, contemporaneous, original, accurate.">// pharma-grade audit</span></span>
+<span class="line deterministic">  <span class="cmt">// Record it (event sourcing)</span></span>
+<span class="line deterministic">  <span class="kw">this</span>.<span class="fn">updateState</span>(results, quality); <span class="note" data-note="Event sourcing: append results to the log. State is derived. This enables replay, debugging, crash recovery.">// state from events</span></span>
 <span class="line">} <span class="note" data-note="The loop continues until done tool is called or resources exhausted. That's the entire architecture. Everything else is infrastructure around this.">// repeat until done</span></span>
 <span class="line"></span>
 <span class="line"><span class="cmt">// That's the architecture.</span></span>
