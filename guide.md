@@ -2,15 +2,13 @@
 
 TypeScript patterns for autonomous agents. Based on dozens of research reports and theory going back to 1948.
 
-## . 
-
 ## Someone already figured this out
 
 We read dozens of reports, traced ideas back 80 years, and talked to people running agents in production. They all built the same thing.
 
 [Wiener](papers/wiener-1948-cybernetics.pdf "Cybernetics: Or Control and Communication in the Animal and the Machine") described the architecture in 1948. [Ashby](papers/ashby-1956-cybernetics.pdf "An Introduction to Cybernetics") added the constraints in 1956. [Brooks](papers/brooks-1986-robust-layered.pdf "A Robust Layered Control System For A Mobile Robot") nailed the safety model in 1986. [Juran](https://www.juran.com/blog/the-juran-trilogy-2/ "The Quality Trilogy") distinguished control from improvement in 1986. The theory was done before most of us were born.
 
-> "Stop trying to invent new frameworks. The frameworks exist."
+The lesson: stop trying to invent new frameworks. The frameworks exist.
 
 ### What we found
 
@@ -60,6 +58,8 @@ The entire agent architecture. The stochastic part is three lines. Everything el
 
 [Norbert Wiener](papers/wiener-1948-cybernetics.pdf "Cybernetics: Or Control and Communication in the Animal and the Machine (1948)") drew feedback loops in 1948 when he was working on anti-aircraft guns. The target moves, you observe, you adjust. Control systems have looked like this ever since.
 
+[Yao et al.](https://arxiv.org/abs/2210.03629 "ReAct: Synergizing Reasoning and Acting in Language Models (2023)") formalized this as ReAct: Thought → Action → Observation. The thought is what the model plans to do. The action is the tool call. The observation is what came back. Then the cycle repeats. It's Wiener's loop with explicit reasoning steps.
+
 ### Why everyone builds the same thing
 
 We looked at [Claude Code](https://github.com/anthropics/claude-code "Claude Code: Agentic coding tool"), [Loom](https://github.com/ghuntley/loom "Loom: AI-powered coding agent"), [Browser-Use](https://github.com/browser-use/browser-use "Browser-Use: Browser automation for AI agents"). Different teams, different companies, different years. Same architecture.
@@ -87,15 +87,104 @@ while (!done) {
 }
 ```
 
-Wiener drew this in 1948.
+This is Wiener's feedback loop, applied to LLMs.
 
-## 02. Tool design
+## 02. The prompt
+
+> The LLM is a language function approximator. It emulates reasoning through language. That's it.
+
+### What an LLM actually does
+
+[Anthropic](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents "Effective Context Engineering for AI Agents") calls it *context engineering*—not prompt engineering. You're not crafting magic words. You're managing a finite resource: the context window.
+
+The LLM predicts the next token based on everything before it. Reasoning emerges from this prediction at scale. Your job is to give it the right context so the next token is useful.
+
+### The right altitude
+
+Two failure modes:
+
+- **Too prescriptive:** Brittle if-else logic in natural language. Breaks when reality doesn't match your script.
+- **Too vague:** Not enough signal. The model guesses.
+
+Find the middle. Specific enough to guide, flexible enough to handle variation.
+
+`prompt-structure.ts`
+
+```typescript
+// System prompt anatomy
+const systemPrompt = {
+  identity: 'You are a code reviewer...',
+  instructions: 'Review for bugs, security, clarity...',
+  toolGuidance: 'Use read_file before suggesting changes...',
+  outputFormat: 'Return JSON with severity, location, message...',
+};
+
+// The right altitude: specific outcomes, flexible methods
+```
+
+### Skills: progressive disclosure
+
+[Claude Code](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/ "Claude Agent Skills Deep Dive") loads instructions on-demand through skills. A skill is a markdown file that injects specialized instructions when needed.
+
+Three levels of loading (based on [Claude Code measurements](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/ "Claude Agent Skills Deep Dive")):
+
+1. **Metadata:** Name and description. Always visible. ~100 tokens.
+2. **Core instructions:** Full SKILL.md body. Loaded when Claude determines relevance. ~2,000-5,000 tokens typical.
+3. **Supplementary:** Referenced files, scripts. Loaded only as needed. Unbounded.
+
+This is progressive disclosure applied to prompts. Start small. Load more when necessary.
+
+`skill-loading.ts`
+
+```typescript
+// Skills: load what you need, when you need it
+const skills = [
+  {
+    name: 'code-review',
+    description: 'Review code for issues',  // Level 1: always visible
+    // Level 2-3: loaded on invocation
+  },
+];
+
+// Selection is pure LLM reasoning—no embeddings, no classifiers
+// Claude reads descriptions and matches intent
+```
+
+**What it gets right:** The principle is sound—don't load 10,000 tokens of instructions when you only need 500. Selection via LLM reasoning (read descriptions, match intent) avoids the complexity of embedding-based retrieval.
+
+**What's worth noting:** The three-level system is Claude Code's implementation. The underlying principle is simpler: load instructions when the task needs them. A flat list of skills with on-demand loading achieves most of the benefit.
+
+### Context anchors
+
+Context windows have a problem: information in the middle gets less attention than the beginning and end. [Agents at Work](https://promptengineering.org/agents-at-work-the-2026-playbook-for-building-reliable-agentic-workflows/ "2026 Playbook for Reliable Agentic Workflows") found that todo lists help:
+
+> "By constantly rewriting the todo list, agents recite objectives into the end of the context. This pushes the global plan into the model's recent attention span."
+
+Write state to files. Read it back. This puts critical information where the model pays attention.
+
+### Recursive Language Models
+
+[Recursive Language Models](https://arxiv.org/html/2512.24601v1 "Recursive Language Models, MIT 2025") treat context as an external environment—the model writes Python to query what it needs via a REPL.
+
+**What they get right:** Selective access beats cramming. MIT reports 3x cost reduction because the model only views what's relevant. This validates our priority: compaction over summarization.
+
+**What's worth noting:** You probably don't need a REPL layer. Writing state to files and reading it back (Section 05) achieves selective access more simply. RLMs validate the principle; most production agents don't need the implementation.
+
+### Observation masking
+
+[JetBrains](https://blog.jetbrains.com/research/2025/12/efficient-context-management/ "The Complexity Trap, NeurIPS 2025") found that simple masking (omitting tool outputs from context) halves costs while matching summarization quality. The key insight: the model doesn't need to see everything it produces, just the parts relevant to the next step.
+
+**What they get right:** Instead of expensive summarization, mark outputs as ephemeral. The model retains what matters through its own attention patterns rather than explicit compression.
+
+**What's worth noting:** This works best for intermediate results (search outputs, API responses) where the final artifact matters more than the path. Full context still beats masking when debugging or when you need to explain how you got there.
+
+## 03. Tools
 
 > Give the agent more tools than you think it needs. Check what it does with them. Cut back if you have to.
 
 ### Ashby's Law
 
-[Ross Ashby](papers/ashby-1956-cybernetics.pdf "An Introduction to Cybernetics (1956)"), 1956: *"Only variety can absorb variety."* Translation: your agent can only handle problems as complex as its tool set allows. When people say "the model is dumb," often the model just didn't have the right tools.
+[Ross Ashby](papers/ashby-1956-cybernetics.pdf "An Introduction to Cybernetics (1956)"), 1956: *"Only variety can destroy variety."* (Often paraphrased as "absorb" by Stafford Beer.) Translation: your agent can only handle problems as complex as its tool set allows. When people say "the model is dumb," often the model just didn't have the right tools.
 
 ### The usual mistake
 
@@ -133,13 +222,57 @@ const getBrowserState: Tool = {
 
 Start generous. Restrict based on evidence.
 
-## 03. Verification
+### MCP: the de facto standard
+
+[Model Context Protocol](https://modelcontextprotocol.io/specification/2025-11-25 "MCP Specification") won. [~40 million monthly SDK downloads](https://npmtrends.com/@modelcontextprotocol/sdk "MCP SDK npm trends") as of January 2026. [Donated to the Linux Foundation](https://www.anthropic.com/news/model-context-protocol-a2a-linux-foundation "MCP joins Linux Foundation") December 2025. Think of it as USB-C for AI—one protocol for many capabilities.
+
+MCP defines three primitives:
+
+- **Tools:** Functions the agent can call (read file, query database, send email)
+- **Resources:** Data the agent can access (files, database rows, API responses)
+- **Prompts:** Templates for common interactions
+
+One interface. Any tool provider. Your agent doesn't care if the database tool comes from your code or a third-party server.
+
+**Security note:** Adoption outpaced security hardening. [Equixly's audit](https://www.docker.com/blog/mcp-security-issues-threatening-ai-infrastructure/ "MCP Security Issues Threatening AI Infrastructure") found 43% of tested MCP servers had command injection vulnerabilities. [Invariant Labs](https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks "MCP Security: Tool Poisoning Attacks") documented tool poisoning attacks. The protocol is sound; implementations need scrutiny. Treat third-party MCP servers like third-party npm packages—audit before trusting.
+
+### Token efficiency
+
+These patterns aren't part of MCP—they're Anthropic-specific features that work alongside any tool interface. Token-efficient tool mode graduated from beta with Claude 4. [Anthropic's research](https://www.anthropic.com/engineering/advanced-tool-use "Advanced Agentic Patterns") shows significant context savings:
+
+**Tool Search:** Don't load all tools upfront. Use `defer_loading: true` and let the agent discover tools on demand. Anthropic reports [85% fewer tokens](https://www.anthropic.com/engineering/advanced-tool-use "Advanced Tool Use") in their testing. *Note: This is Anthropic API-specific, not a general MCP feature.*
+
+**Programmatic Calling:** Let code execution filter results before they hit context. Query returns 10,000 rows? Filter to 10 in the sandbox. Anthropic's example showed [37% typical reduction](https://www.anthropic.com/engineering/code-execution-with-mcp "Code Execution with MCP"), though savings vary with data size—bulk data filtering sees larger gains.
+
+**Token-efficient mode:** Reduces output tokens by 14-70%. The agent returns tool calls without repeating the schema. Now enabled by default in Claude 4.
+
+`tool-efficiency.ts`
+
+```typescript
+// Tool search: Anthropic-specific feature
+const tools = [
+  { type: 'tool_search_tool_regex_20251119' },
+  {
+    name: 'query_database',
+    defer_loading: true,  // Only loaded when discovered
+  },
+];
+
+// Programmatic calling: filter in sandbox
+const queryTool = {
+  name: 'query_database',
+  allowed_callers: ['code_execution_20250825'],
+  // Results filtered before hitting context
+};
+```
+
+## 04. Verification
 
 > The LLM gets it right maybe 70% of the time. Your verification code catches the other 30%.
 
 ### Do the math
 
-Say each step works 70% of the time. Over 10 steps:
+Illustrative example: say each step works 70% of the time. Over 10 steps:
 
 `0.70^10 = 2.8%`
 
@@ -147,13 +280,15 @@ Now add verification that catches 80% of mistakes:
 
 `0.94^10 = 53.8%`
 
-Verification turns a useless agent into one that works half the time. Add retries and you're in business.
+The specific numbers will vary by task and model, but the principle holds: verification compounds. Without it, multi-step success rates collapse. With it, you have a chance.
 
-**Note:** This catches *sporadic* errors—malformed output, type mismatches, policy violations. It doesn't catch *chronic waste*—500 lines for a 20-line task. For that, see Section 09.
+**Note:** This catches *sporadic* errors—malformed output, type mismatches, policy violations. It doesn't catch *chronic waste*—500 lines for a 20-line task. For that, see Section 10.
 
 ### Safety layers (Brooks, 1986)
 
 [Rodney Brooks](papers/brooks-1986-robust-layered.pdf "A Robust Layered Control System For A Mobile Robot") built robots at MIT. His rule: lower layers override higher layers. Safety beats efficiency. Efficiency beats the goal. The goal never overrides safety.
+
+Brooks' original layers were robot behaviors ("avoid obstacles" subsumes "wander"). Applying his principle to agents, we use (our formulation):
 
 - Layer 0: System safety. Cannot be bypassed.
 - Layer 1: Resource limits.
@@ -185,7 +320,73 @@ const safetyLayers = [
 // Check in order. Stop at first failure.
 ```
 
-## 04. State and memory
+### Defense in depth
+
+Any single check can be bypassed. The attacker has to beat all of them.
+
+Stack defenses across different points: input validation catches malformed requests, policy checks catch unauthorized actions, output filtering catches leaked secrets, sandboxing contains damage from what slips through. [OWASP's agent security guidance](https://owasp.org/www-project-top-10-for-large-language-model-applications/ "OWASP LLM Top 10") recommends this layered approach.
+
+**What this gets right:** When the sanitizer misses an injection, the policy layer might still block the action. When policy fails, the sandbox limits the blast radius.
+
+**What's worth noting:** Defense in depth isn't about paranoia—it's about acknowledging that each layer has blind spots. The goal isn't perfect security at each layer. It's enough overlap that attackers can't thread the gaps.
+
+### Hooks: integration points for verification
+
+[Claude Code hooks](https://code.claude.com/docs/en/hooks "Claude Code Hooks Reference") are shell commands that run at lifecycle events. They don't implement Brooks' layers—they provide integration points where *you* can implement them. Your verification code runs at defined points:
+
+- **PreToolUse:** Before any tool executes. *You* enforce Layer 0-2 here. Can modify inputs via `additionalContext`.
+- **PostToolUse:** After execution. Run linters, formatters, tests.
+- **Stop:** Before the agent completes. Final validation.
+
+Hooks can do more than block. PreToolUse can modify inputs—sanitize arguments, inject additional context, transform parameters before the tool sees them. Hooks can also be scoped to specific tools or skills—a code-review skill might have stricter linting hooks than a general assistant.
+
+`hooks.json`
+
+```json
+{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "command": "node verify-action.js",
+      "timeout": 5000
+    },
+    {
+      "event": "PostToolUse",
+      "command": "npm run lint -- --fix",
+      "tools": ["Edit", "Write"]
+    }
+  ]
+}
+```
+
+The theory said "lower layers win." Hooks are where you make that happen in code.
+
+### Policy languages
+
+Hooks tell you *when* to check. But what rules do you check?
+
+[Cedar](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy-understanding-cedar.html "Cedar Policy Language for AWS AgentCore") and [AgentSpec](https://arxiv.org/abs/2503.18666 "AgentSpec: Customizable Runtime Guardrails, ICSE 2026") are current attempts. Cedar is AWS's production implementation—declarative permit/deny rules evaluated at a gateway. AgentSpec is academic—a DSL with 90% prevention rate in research evaluations.
+
+**What they get right:** Rules in deterministic code can't be argued with. The agent never sees tools it isn't permitted to use.
+
+**Where they overcomplicate:** Most teams don't need a new language. A TypeScript function validating against a rule set achieves the same thing:
+
+```typescript
+// You probably don't need Cedar. This works.
+const policies = [
+  { tool: 'refund', check: (ctx) => ctx.amount < 500 },
+  { tool: 'delete', check: (ctx) => ctx.user.role === 'admin' },
+];
+
+function isPermitted(action, context) {
+  const policy = policies.find(p => p.tool === action.tool);
+  return policy ? policy.check(context) : false;
+}
+```
+
+Cedar's value is governance at scale—many agents, auditable policies, compliance requirements. For one agent, you probably don't need it.
+
+## 05. State and memory
 
 > Write things to files. Context windows fill up and cost money. Disk is cheap.
 
@@ -233,7 +434,44 @@ class EventStore {
 }
 ```
 
-## 05. Security
+### Context management
+
+[Anthropic](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents "Effective Context Engineering") calls context a finite, precious resource. [Jason Liu](https://jxnl.co/writing/2025/08/30/context-engineering-compaction/ "Context Engineering: Compaction") frames compaction as preserving "optimization trajectories"—the reasoning path that got you here.
+
+Based on these insights, we prioritize (our synthesis):
+
+1. **Raw context:** Keep everything. Best quality.
+2. **Observation masking:** Mark tool outputs as ephemeral (see Section 02). Model retains what matters through attention, not explicit storage.
+3. **Compaction:** Strip redundant info but preserve structure. Reversible.
+4. **Summarization:** Lossy. Last resort.
+
+The key insight: compact *before* you hit limits. Don't wait until you're at 95% capacity.
+
+`context-management.ts`
+
+```typescript
+const PRE_ROT_THRESHOLD = 0.75;  // 75% of context limit
+
+function manageContext(messages, limit) {
+  const usage = countTokens(messages) / limit;
+
+  if (usage > PRE_ROT_THRESHOLD) {
+    // Compaction: reversible, preserves structure
+    return compact(messages, {
+      keepFilePaths: true,     // References, not full content
+      keepRecentToolCalls: 5,  // Preserve "rhythm"
+      dropOldScreenshots: true,
+    });
+  }
+
+  return messages;
+  // Summarization only when compaction isn't enough
+}
+```
+
+State survives context limits when you write it to files. Skills, todo lists, checkpoints—all filesystem. The context window can reset. The files remain.
+
+## 06. Security
 
 > Three things together cause problems: private data, outside input, and actions that affect the world. Remove one.
 
@@ -247,8 +485,15 @@ class EventStore {
 
 Then someone can trick it into leaking your secrets or doing things you didn't authorize. **Any two of these three are fine. All three together is a problem.**
 
+[Meta's Rule of Two](https://ai.meta.com/blog/practical-ai-agent-security/ "Agents Rule of Two: A Practical Approach to AI Agent Security") formalizes this as a design constraint: an agent should satisfy *at most two* of [A] untrusted inputs, [B] sensitive data, [C] external actions.
+
 > "Prompt injection is an architectural flaw."
 > — [Simon Willison](https://simonwillison.net/series/prompt-injection/ "Prompt Injection series")
+
+OpenAI acknowledged the same limitation in December 2025:
+
+> "Prompt injection, much like scams and social engineering on the web, is unlikely to ever be fully 'solved.'"
+> — [OpenAI](https://fortune.com/2025/12/23/openai-ai-browser-prompt-injections-cybersecurity-hackers/ "OpenAI on ChatGPT Atlas security")
 
 ### Defense in depth
 
@@ -280,7 +525,37 @@ function assessTrifectaRisk(assessment) {
 }
 ```
 
-## 06. Evaluation
+### The box
+
+[Marc Brooker](https://brooker.co.za/blog/2026/01/12/agent-box.html "Agent Safety is a Box") names the pattern: a deterministic control layer *outside* the agent. All tool calls flow through a gateway. The gateway checks policy before execution.
+
+**What it gets right:** If your agent can be convinced to ignore system prompt constraints, you have a problem. If your gateway refuses unauthorized tools regardless of what the agent says, you have a solution. The agent can't reason its way past code.
+
+**What's worth noting:** If you're already routing tool calls through validation (which you should be after reading this section), you already have the box. Brooker's contribution is the clear mental model and the argument for why prompt-based safety is insufficient.
+
+### New attack surfaces
+
+[Skills](https://arxiv.org/html/2601.10338 "Skills Security Research") and [MCP](https://simonwillison.net/2025/Jun/13/prompt-injection-design-patterns/ "Prompt Injection Design Patterns") add new risks:
+
+**Skills consent gap:** User approves a skill once. The skill then has persistent permissions. An attacker who compromises a skill inherits those permissions.
+
+**MCP tool confusion:** A malicious MCP server could provide a tool named `read_file` that looks legitimate but exfiltrates data. Users see tool names, not implementations.
+
+**Plan-then-execute:** [Simon Willison](https://simonwillison.net/2025/Jun/13/prompt-injection-design-patterns/ "Prompt Injection Patterns") recommends generating a fixed action list, then executing only those actions. Untrusted data processes during planning can't inject new actions during execution.
+
+`plan-then-execute.ts`
+
+```typescript
+// Constrain actions to a fixed plan
+const plan = await llm.generatePlan(task);  // Fixed action list
+
+for (const action of plan.actions) {
+  // Untrusted data can't inject new actions here
+  await execute(action);
+}
+```
+
+## 07. Evaluation
 
 > Run the same test 50 times. Look at the distribution. Single runs tell you nothing.
 
@@ -297,6 +572,15 @@ An agent that works 70% of the time will sometimes pass your test and sometimes 
 | Does it work? | How often does it work? |
 | Pass or fail | Success rate with confidence interval |
 | Fix the bug | Shift the distribution |
+
+### pass@k vs pass^k
+
+Two metrics, different questions:
+
+- **pass@k**: Run k times, at least one succeeds. Measures *coverage*—can the agent ever solve this?
+- **pass^k**: Run k times, all succeed. Measures *reliability*—can you trust the agent in production?
+
+[Holistic Evaluation of Language Models](https://crfm.stanford.edu/helm "HELM") uses both. A 90% pass@5 with 20% pass^5 means the agent can solve the problem but you can't predict when. Production needs pass^k.
 
 `evaluation.test.ts`
 
@@ -317,7 +601,19 @@ test('agent works >80% of the time', async () => {
 // 95% confidence interval is [72%, 88%]
 ```
 
-## 07. Operations
+### LLM-as-judge
+
+When you can't write deterministic assertions, use another model to evaluate. [Prometheus 2](https://arxiv.org/abs/2405.01535 "Prometheus 2: Open Source LLM Judges") achieves near-human agreement on code quality judgments.
+
+**What it gets right:** Scales evaluation beyond what humans can review. Catches subtle issues that pattern matching misses.
+
+**What's worth noting:** Judge models have their own biases and blind spots. Calibrate against human judgments first. Use judges for screening, not final verdicts.
+
+### Variance matters
+
+A 70% success rate with 5% variance is more useful than 85% success with 30% variance. Report confidence intervals. Track variance over time. A change that increases mean performance but also increases variance may not be an improvement.
+
+## 08. Operations
 
 > The agent loop is easy. Retries, rate limits, circuit breakers, and monitoring take the real work.
 
@@ -325,13 +621,15 @@ test('agent works >80% of the time', async () => {
 
 Your demo ran once on a good network with a responsive API. Production runs thousands of times with timeouts, rate limits, and services that go down at 3am.
 
-> "Agents that work in demos die in production. The difference is infrastructure."
+Agents that work in demos die in production. The difference is infrastructure.
 
 ### What you need
 
 - **Exponential Backoff:** When a call fails, wait longer before retrying. Add randomness so you don't hit the API at the same time as everyone else.
 - **Circuit Breaker:** If a service fails 5 times in a row, stop calling it for a minute. Don't waste resources on something that's down.
 - **Rate Limiting:** Agents can make unbounded requests. Put a ceiling on it.
+- **Token Budgets:** Set per-task and per-session limits. An agent that solves a problem using $50 of tokens may not have solved it usefully.
+- **Idempotency Keys:** Tool calls should be safe to retry. If a retry sends a second email or processes a second payment, your ops infrastructure failed.
 - **Health Checks:** Know when things break before your users tell you.
 
 `ops.ts`
@@ -357,11 +655,11 @@ async function withRetry<T>(
 }
 ```
 
-## 08. Orchestration
+## 09. Orchestration
 
 > One coordinator hands out work. Workers do the work. Workers never hand out more work.
 
-### Why one level
+### Bounded delegation
 
 Let workers spawn their own workers and you get:
 
@@ -369,9 +667,11 @@ Let workers spawn their own workers and you get:
 - Latency that hides until everything times out at once
 - Debugging that requires tracing every branch of every branch
 
-One team let agents spawn agents. Their bill hit **$2000/day** before they noticed.
+We've heard of teams letting agents spawn agents. Bills hitting $2000/day before anyone noticed. The pattern is common enough to warn against.
 
-> "You talk to the foreman, not the workers."
+"One level" is the simple version. The general principle is *bounded delegation*: the coordinator sets explicit limits on recursion depth, token budget, and execution time. Workers operate within those bounds.
+
+Think of it like construction: you talk to the foreman, not the workers.
 
 ### The pattern
 
@@ -399,7 +699,59 @@ async function coordinator(task) {
 }
 ```
 
-## 09. Quality
+### MCP vs A2A
+
+Two protocols, two directions. Both donated to the Linux Foundation December 2025:
+
+- **[MCP](https://modelcontextprotocol.io/ "Model Context Protocol"):** Vertical. Agent connects to tools. One agent, many capabilities.
+- **[A2A](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/ "A2A Protocol"):** Horizontal. Agent connects to agents. Coordination across systems.
+
+> "A2A focuses on how agents communicate with each other (horizontally), while MCP focuses on how a single agent connects to tools (vertically)."
+> — [Auth0](https://auth0.com/blog/mcp-vs-a2a/ "MCP vs A2A")
+
+### Context isolation
+
+Workers explore internally. They might process 50,000 tokens of search results, code, documentation. The coordinator doesn't need all that. Workers return summaries.
+
+`context-isolation.ts`
+
+```typescript
+// Workers return summaries, not full traces
+const workerResult = await worker.execute(subtask);
+// Worker explored 50K tokens internally
+// Returns 1-2K token summary
+
+coordinator.addContext({
+  subtask: subtask.id,
+  outcome: workerResult.summary,
+  artifacts: workerResult.files,  // References, not content
+});
+```
+
+Share memory by communicating. Don't communicate by sharing memory. (Go proverb, via Rob Pike)
+
+### Context poisoning
+
+When workers share context, hallucinations propagate. Worker A hallucinates a fact. Worker B references it. Worker C cites B as confirmation. The false information looks well-sourced because it has multiple "references."
+
+Context isolation (above) is the defense. Each worker starts clean. Results go through the coordinator, which can verify before incorporating.
+
+**What this gets right:** Isolation treats each worker as untrusted input to the coordinator. The coordinator can validate claims, check sources, reject contradictions.
+
+**What's worth noting:** Full isolation isn't always practical. When workers need to share state (e.g., a codebase), bound what they can modify. Prefer immutable shared resources plus explicit handoffs for mutations.
+
+### What the coordinator keeps
+
+The coordinator maintains minimal state across worker calls:
+
+- **Task decomposition:** Which subtasks exist and their dependencies
+- **Completion status:** What's done, what's pending, what failed
+- **Summaries:** The 1-2K token results from each worker
+- **Artifacts:** References to files workers created (not the files themselves)
+
+Workers are stateless between invocations. The coordinator is the only entity with memory.
+
+## 10. Quality
 
 > Quality isn't a layer you add. It emerges from the system.
 
@@ -410,9 +762,9 @@ async function coordinator(task) {
 The architecture in this guide IS the quality system:
 
 - **The loop (01)**: Feedback is quality. You observe results and adjust. Wiener's whole point.
-- **Verification (03)**: Brooks' safety layers catch errors before they execute.
-- **State (04)**: Event sourcing gives you replay, debugging, crash recovery. That's your audit trail.
-- **Evaluation (06)**: Statistical thinking. Run it 50 times, look at the distribution. Shift the distribution, not just fix bugs.
+- **Verification (04)**: Brooks' safety layers catch errors before they execute.
+- **State (05)**: Event sourcing gives you replay, debugging, crash recovery. That's your audit trail.
+- **Evaluation (07)**: Statistical thinking. Run it 50 times, look at the distribution. Shift the distribution, not just fix bugs.
 
 ### What this doesn't catch
 
@@ -430,11 +782,21 @@ Track these over time:
 - **Proportionality**: Actual lines vs. expected lines for the task.
 - **Review time ratio**: Hours to review vs. minutes to generate.
 
-These surface chronic problems that verification misses.
+[GitClear's analysis](https://www.gitclear.com/coding_on_copilot_data_shows_ais_downward_pressure_on_code_quality "AI's Downward Pressure on Code Quality") of 153M lines (2020-2023) found: code churn doubled post-Copilot adoption, code duplication increased 4x, and "moved" code (refactoring indicator) dropped. The data suggests AI accelerates writing while degrading maintenance.
+
+These metrics surface chronic problems that verification misses.
+
+### The velocity paradox
+
+[Faros AI](https://www.faros.ai/blog/ai-software-engineering "The AI Productivity Paradox Research Report") measured real developer workflows across 10,000+ developers: 91% increase in PR review time, 21% more tasks completed, but the bottleneck moved to human approval. Generation is faster. Delivery isn't.
+
+**What this means:** Optimizing for generation speed without optimizing for review and integration can decrease total velocity. The bottleneck shifts from writing to reviewing.
+
+**What to track:** Time from commit to production, not time to first commit. PRs merged per week, not PRs opened. Working software, not working code.
 
 ### Stop the line
 
-When quality checks fail, don't continue hoping someone catches it downstream. This extends verification (03): if the output is wrong, stop.
+When quality checks fail, don't continue hoping someone catches it downstream. This extends verification (04): if the output is wrong, stop.
 
 ```typescript
 // Extend verification: stop on quality failure
@@ -448,7 +810,7 @@ if (metrics.proportionality.ratio > 5) {
 
 This isn't a new layer. It's verification applied to chronic waste, not just sporadic errors.
 
-## 10. Complete example
+## 11. Complete example
 
 > All of it together in one working system.
 
@@ -456,8 +818,8 @@ This isn't a new layer. It's verification applied to chronic waste, not just spo
 
 1. **CLI:** Parse arguments, load config, wire things up
 2. **Ops:** Retry logic, circuit breakers, rate limits
-3. **Security:** Trifecta checks, sandboxing, input sanitization
-4. **Agent:** The loop, tools, verification, state
+3. **Security:** Trifecta checks, plan-then-execute, input sanitization
+4. **Agent:** The loop, MCP tools, hooks, context management
 
 ### Run it
 
@@ -476,16 +838,26 @@ A production agent. The theory goes back to 1948. The patterns come from teams r
 ```typescript
 // Everything together: the complete agent architecture
 
+// Load skills on demand (progressive disclosure)
+const skills = await loadRelevantSkills(task);
+
 // The loop (Wiener, 1948)
 while (this.canContinue()) {
-  const response = await this.ops
-    .callLlm(() => this.queryLLM());
+  // Manage context before it rots
+  this.messages = manageContext(this.messages, CONTEXT_LIMIT);
 
-  // Verify it (Brooks' layers)
-  const verified = await this.verifyResponse(response);
+  const response = await this.ops.callLlm(
+    () => this.queryLLM(skills)
+  );
 
-  // Run it
+  // Hooks: PreToolUse (enforce Brooks' layers here)
+  const verified = await this.hooks.preToolUse(response);
+
+  // Run it (MCP tools)
   const results = await this.executeTools(verified.toolCalls);
+
+  // Hooks: PostToolUse (quality gates)
+  await this.hooks.postToolUse(results);
 
   // Record it (event sourcing)
   this.updateState(results);
