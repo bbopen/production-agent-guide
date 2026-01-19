@@ -95,7 +95,7 @@ This is Wiener's feedback loop, applied to LLMs.
 
 ### What an LLM actually does
 
-[Anthropic](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents "Effective Context Engineering for AI Agents") calls it *context engineering*, not prompt engineering. You're not crafting magic words. You're managing a finite resource: the context window.
+[Anthropic](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents "Effective Context Engineering for AI Agents") calls it *context engineering*. The work is managing a finite resource: the context window.
 
 The LLM predicts the next token based on everything before it. Reasoning emerges from this prediction at scale. Your job is to give it the right context so the next token is useful.
 
@@ -737,7 +737,7 @@ Workers are stateless between invocations. The coordinator is the only entity wi
 
 ## 10. Quality
 
-> Quality isn't a layer you add. It emerges from the system.
+> Quality emerges from the system.
 
 ### Deming's insight
 
@@ -792,7 +792,7 @@ if (metrics.proportionality.ratio > 5) {
 }
 ```
 
-This isn't a new layer. It's verification applied to chronic waste, not just sporadic errors.
+Same verification principle, applied to chronic waste rather than sporadic errors.
 
 ## 11. Complete example
 
